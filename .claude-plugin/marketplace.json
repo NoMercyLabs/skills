@@ -8,7 +8,7 @@
       "displayName": "NoMercy Labs skills",
       "source": "./",
       "description": "Every NoMercy Labs skill in one plugin: atlas documents a whole project as one system, devbox-anywhere builds a containerized dev environment from what the repo actually uses.",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "author": { "name": "NoMercy Labs", "url": "https://github.com/NoMercyLabs" },
       "homepage": "https://github.com/NoMercyLabs/skills",
       "repository": "https://github.com/NoMercyLabs/skills",
