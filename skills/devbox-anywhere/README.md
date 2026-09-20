@@ -172,7 +172,7 @@ Full detail in [references/security.md](references/security.md). The invariants:
 - The editor does not run as root.
 
 Powers the box *does* hold, stated plainly so you can remove them knowingly: passwordless sudo
-**inside the container**, full access to the mounted repository, and — **opt-in, commented out in
+**inside the container** for a fixed list of commands (the package manager, groupadd, usermod, docker), full access to the mounted repository, and — **opt-in, commented out in
 the template** — the host's docker socket, which is root-equivalent control of the host machine.
 
 If the box will be reachable by anyone else, it needs TLS plus an auth gate at the proxy **and**

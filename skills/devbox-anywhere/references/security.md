@@ -78,10 +78,17 @@ converts that into a checklist shown before any work starts.
 Development environments need real capability. These are the deliberate grants; each is listed so
 an operator can remove it knowingly.
 
-**Passwordless sudo inside the container.** Needed for two things: the entrypoint joining the
-docker socket's group, and a developer installing a missing package mid-task. Its scope is the
-container, not the host. Remove the `sudoers.d` line if your policy forbids it — the socket
-group-join is then the only feature that stops working.
+**Passwordless sudo inside the container, for a fixed list of commands.** `apt-get`, `apt` and
+`dpkg`, so a developer can install a missing package mid-task; `groupadd` and `usermod`, which the
+entrypoint needs to join the docker socket's group; and `docker`, for the Docker Desktop case where
+the socket arrives root-owned. Every other command asks for a password the user does not have.
+Its scope is the container, not the host. Remove the `sudoers.d` line if your policy forbids it,
+and the socket group-join is then the only feature that stops working.
+
+**The bootstrap command.** `DEVBOX_BOOTSTRAP` in `docker-compose.yml` is run by the entrypoint at
+start, as the unprivileged user, so a dependency restore happens before the first terminal opens.
+It is a value you wrote into your own compose file. The agent fills it from what the repo needs
+and nothing in the repository can set it.
 
 **The workspace bind mount.** The box has full read/write access to the repository. That is the
 point of a dev environment. It has no access to anything else on the host filesystem.
@@ -111,12 +118,13 @@ the socket enabled, exposing the editor is exposing the host, full stop.
 
 ## Supply chain
 
-The image installs from three kinds of source. Know which is which:
+The image installs from three kinds of source. Know which is which. Nothing is piped from a URL
+into a shell: every vendor source is either a signed apt repository or a pinned release file.
 
 | Source | Examples | Note |
 |---|---|---|
 | Distribution packages, signed | `apt` from Debian, plus vendor apt repos added with their signing key (Docker, GitHub CLI, NodeSource) | The keyring is fetched over HTTPS and referenced with `signed-by=`, so package signatures are verified |
-| Vendor installer over HTTPS | `curl -fsSL https://code-server.dev/install.sh \| sh` | This is the vendor's published install path. If your policy forbids piping an installer to a shell, replace it with the vendor's `.deb` at a pinned version |
+| Vendor release package, pinned | code-server's `.deb` from its GitHub release at the version in `CODE_SERVER_VERSION` | Downloaded as a file and handed to dpkg. No installer script is fetched or executed anywhere in the image |
 | Language package managers | `npm install -g <cli>` | Pin versions where the tool's behaviour matters to the gates |
 
 **Pin everything.** An unpinned base image or tool version turns an untouched project into a build

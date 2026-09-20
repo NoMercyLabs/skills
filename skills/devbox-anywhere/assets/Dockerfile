@@ -43,9 +43,14 @@ ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 # <block>   # justified by: <repo file>
 
 # --- code-server -------------------------------------------------------------
-# The browser editor. Installed from the vendor's own installer over HTTPS; see
-# references/security.md for why that is accepted here and what to do if your policy forbids it.
-RUN curl -fsSL https://code-server.dev/install.sh | sh
+# The browser editor, from the vendor's signed release package at a pinned version. No installer
+# script is fetched or executed; the file is downloaded, then handed to dpkg. Bump the version by
+# changing the ARG, and check the releases page that the tag exists.
+ARG CODE_SERVER_VERSION=4.138.0
+RUN curl -fsSL "https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server_${CODE_SERVER_VERSION}_${TARGETARCH}.deb" \
+        -o /tmp/code-server.deb \
+    && dpkg -i /tmp/code-server.deb \
+    && rm /tmp/code-server.deb
 
 # --- unprivileged user -------------------------------------------------------
 # Two reasons for the UID/GID build args: files the box writes into the bind-mounted repo stay
@@ -54,13 +59,16 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 # The rename branches exist because many base images already ship a user at uid 1000 under a
 # different name - a bare useradd fails on exactly those images.
 #
-# Passwordless sudo is granted deliberately: the entrypoint needs it to join the docker socket's
-# group, and a developer needs it to apt-install a missing tool mid-task. Scope of that power is
-# this container, not the host. Drop the sudoers line if your policy requires it - the docker
-# socket group-join is then the only thing that stops working.
+# Passwordless sudo is granted for a fixed list of commands, not for everything: the package
+# manager, so a developer can install a missing tool mid-task; groupadd and usermod, which the
+# entrypoint needs to join the docker socket's group; and docker itself, for the Docker Desktop
+# case where the socket arrives root-owned. Anything else asks for a password the user does not
+# have, which is the point. Scope of that power is this container, not the host. Drop the sudoers
+# line if your policy requires it - the docker socket group-join is then the only thing that
+# stops working.
 RUN if getent group ${USER_GID} >/dev/null; then groupmod -n ${USERNAME} "$(getent group ${USER_GID} | cut -d: -f1)"; else groupadd -g ${USER_GID} ${USERNAME}; fi \
     && if getent passwd ${USER_UID} >/dev/null; then usermod -l ${USERNAME} -d /home/${USERNAME} -m "$(getent passwd ${USER_UID} | cut -d: -f1)"; else useradd -m -u ${USER_UID} -g ${USER_GID} -s /bin/bash ${USERNAME}; fi \
-    && echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} \
+    && echo "${USERNAME} ALL=(root) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /usr/bin/dpkg, /usr/sbin/groupadd, /usr/sbin/usermod, /usr/bin/docker" > /etc/sudoers.d/${USERNAME} \
     && chmod 0440 /etc/sudoers.d/${USERNAME} \
     # Every directory a named volume will mount over must exist here and be owned by the user.
     # Docker seeds an empty named volume from the image path; if the path is missing, the volume
@@ -104,8 +112,6 @@ RUN chmod +x /usr/local/bin/devbox-entrypoint /usr/local/bin/devbox-auth \
         > /usr/local/etc/devbox-auth-hook.sh \
     && ln -sf /usr/local/etc/devbox-auth-hook.sh /etc/profile.d/10-devbox-auth.sh \
     && printf '\n. /usr/local/etc/devbox-auth-hook.sh\n' >> /etc/bash.bashrc
-. /usr/local/etc/devbox-auth-hook.sh
-' >> /etc/bash.bashrc
 
 USER ${USERNAME}
 WORKDIR /workspace

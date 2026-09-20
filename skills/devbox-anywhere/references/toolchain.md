@@ -58,8 +58,11 @@ downgrading the project.
 ### Node
 
 ```dockerfile
-RUN curl -fsSL https://deb.nodesource.com/setup_<major>.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
+RUN install -m 0755 -d /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_<major>.x nodistro main" \
+        > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/* \
     && corepack enable        # only if the lockfile is pnpm/yarn
 ```
@@ -120,8 +123,14 @@ RUN set -eux; \
 ### code-server
 
 ```dockerfile
-RUN curl -fsSL https://code-server.dev/install.sh | sh
+ARG CODE_SERVER_VERSION=<a release that exists, check the releases page>
+RUN curl -fsSL "https://github.com/coder/code-server/releases/download/v${CODE_SERVER_VERSION}/code-server_${CODE_SERVER_VERSION}_${TARGETARCH}.deb" \
+        -o /tmp/code-server.deb \
+    && dpkg -i /tmp/code-server.deb && rm /tmp/code-server.deb
 ```
+
+The vendor's signed `.deb` at a pinned version. No installer script is fetched or run: the file
+is downloaded, then handed to dpkg, and the version is the one in the ARG.
 
 ### Non-root user with the host's ids
 
@@ -131,7 +140,7 @@ ARG USER_UID=1000
 ARG USER_GID=1000
 RUN if getent group ${USER_GID} >/dev/null; then groupmod -n ${USERNAME} "$(getent group ${USER_GID} | cut -d: -f1)"; else groupadd -g ${USER_GID} ${USERNAME}; fi \
     && if getent passwd ${USER_UID} >/dev/null; then usermod -l ${USERNAME} -d /home/${USERNAME} -m "$(getent passwd ${USER_UID} | cut -d: -f1)"; else useradd -m -u ${USER_UID} -g ${USER_GID} -s /bin/bash ${USERNAME}; fi \
-    && echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/${USERNAME} && chmod 0440 /etc/sudoers.d/${USERNAME}
+    && echo "${USERNAME} ALL=(root) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /usr/bin/dpkg, /usr/sbin/groupadd, /usr/sbin/usermod, /usr/bin/docker" > /etc/sudoers.d/${USERNAME} && chmod 0440 /etc/sudoers.d/${USERNAME}
 ```
 
 Many base images already have a UID-1000 user under a different name — hence the rename branches
