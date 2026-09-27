@@ -49,11 +49,11 @@ python3 scripts/check_docs.py all --map docs-work/map.md --src src --docs docs
 
 | Gate | Passes when |
 | --- | --- |
-| `coverage` | The union of every slice's opened-file list equals a real walk of the source tree. Secret-bearing files are skipped out loud and fail the gate if a slice opened one. |
+| `coverage` | The union of every slice's `## Files opened` list equals a real walk of the source roots given with `--src`. Fails with no `--src` or an empty walk. The typed counts in a slice header are checked against its list and reported as warnings; the walk decides. Secret-bearing files are skipped out loud and fail the gate if a slice opened one. |
 | `map` | Every source path is covered by a page or excluded with a reason, every concept is owned by one page, every link and assumption names a planned page, every job is one sentence. |
 | `reviews` | Every row is `reviewed` and carries two `Verdict: PASS` files whose `Reviewed-SHA` matches the page's current content. |
 | `links` | Every internal link in the docs resolves to a file or a mapped page. |
-| `status` | Prints DELIVERED or INCOMPLETE. Exits non-zero while any row is not reviewed, so it can be a stop condition. |
+| `status` | Prints DELIVERED or INCOMPLETE. Runs `coverage` too, so it needs `--src`. Exits non-zero while any row is not reviewed or coverage has not passed, so it can be a stop condition. |
 | `mermaid` | Renders the map as a graph. |
 
 Exit code 0 is a pass. Anything else is not.
@@ -95,7 +95,9 @@ npx skills add NoMercyLabs/skills --skill atlas
 
 Or install it as a Claude Code plugin: `/plugin marketplace add NoMercyLabs/skills` then `/plugin install nomercylabs@nomercylabs`, which gives you `/nomercylabs:atlas`.
 
-To make ending early impossible rather than discouraged, wire `check_docs.py status` into your harness's stop condition. In Claude Code that is a `Stop` hook that runs it and exits non-zero while it fails.
+A run loads the skill from this repository. A copy kept inside another repository drifts from it, so an install elsewhere is either a pointer to `NoMercyLabs/skills` or a pinned copy that records the source commit it was taken from.
+
+To make ending early impossible rather than discouraged, wire `check_docs.py status --src <roots>` into your harness's stop condition. In Claude Code that is a `Stop` hook that runs it and exits non-zero while it fails.
 
 ## Design decisions
 

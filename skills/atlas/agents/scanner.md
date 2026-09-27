@@ -51,8 +51,10 @@ Rules that decide whether your report is usable:
 - A field is described by the code that **reads** it. Search for the name, read
   every hit that is not its own declaration.
 - Every row carries a file and a line.
-- `Files opened` must equal `Files given`, and the list must be as long as the
-  count.
+- The list under `## Files opened` is the evidence. The checker reads that one
+  section and compares it with a walk of the tree, so a path named anywhere else
+  does not count as read. The two counts in the header must match the list; a
+  count that disagrees is reported against you.
 
 **An empty section is a claim, and it is the claim most often wrong.** Reporting
 no drift and no traps across a real slice usually means the pass was shallow,

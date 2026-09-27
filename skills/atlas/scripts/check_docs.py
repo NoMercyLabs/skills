@@ -4,7 +4,7 @@
 Every check here fails loudly on a condition the skill would otherwise only
 promise to honor. Nothing in it knows anything about a particular project.
 
-    check_docs.py status   --map docs-work/map.md --reviews docs-work/reviews
+    check_docs.py status   --map docs-work/map.md --reviews docs-work/reviews --src src
     check_docs.py coverage --slices docs-work/slices --src src
     check_docs.py map     --map docs-work/map.md --src src
     check_docs.py reviews --map docs-work/map.md --reviews docs-work/reviews
@@ -18,7 +18,9 @@ Exit code 0 means the gate passed. Anything else means it did not.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
+import io
 import os
 import re
 import sys
@@ -244,6 +246,17 @@ def check_map(rows: list[Row], excluded: list[str], srcs: list[str]) -> int:
     return fail(problems, "map")
 
 
+OPENED_SECTION = re.compile(r"^##\s+files opened\s*$(.*?)(?=^#{1,2}\s|\Z)", re.IGNORECASE | re.MULTILINE | re.DOTALL)
+
+
+def normalize(path: str) -> str:
+    """Forward slashes, no leading "./". A leading dot that names a directory stays."""
+    path = path.replace("\\", "/")
+    while path.startswith("./"):
+        path = path[2:]
+    return path
+
+
 def check_slices(slices_dir: str, srcs: list[str]) -> int:
     """The union of what the slices opened, against what is actually on disk.
 
@@ -252,10 +265,16 @@ def check_slices(slices_dir: str, srcs: list[str]) -> int:
     nobody thought about.
     """
     problems: list[str] = []
+    warnings: list[str] = []
     opened: dict[str, list[str]] = {}
 
-    if not os.path.isdir(slices_dir):
+    if not os.path.isdir(slices_dir) or not any(n.endswith(".md") for n in os.listdir(slices_dir)):
         return fail([f"no slice reports at {slices_dir}"], "coverage")
+
+    # With nothing to walk, every slice list covers an empty tree and the gate
+    # passes having compared nothing.
+    if not srcs:
+        return fail(["no --src given, so there is no tree to compare the slices against"], "coverage")
 
     # Without it, every scanner ran on what it already believed about the language.
     toolchain = os.path.join(os.path.dirname(slices_dir.rstrip("/\\")) or ".", "toolchain.md")
@@ -269,19 +288,24 @@ def check_slices(slices_dir: str, srcs: list[str]) -> int:
         with open(path, encoding="utf-8", errors="replace") as handle:
             body = handle.read()
 
-        listed = re.findall(r"^\s*[-*]\s+`?([^\s`]+\.[A-Za-z0-9]+)`?\s*$", body, re.MULTILINE)
-        for entry in listed:
-            opened.setdefault(entry.replace("\\", "/").lstrip("./"), []).append(name)
-
-        given = re.search(r"^files given:\s*(\d+)", body, re.IGNORECASE | re.MULTILINE)
-        claim = re.search(r"^files opened:\s*(\d+)", body, re.IGNORECASE | re.MULTILINE)
-        if not given or not claim:
-            problems.append(f"{name}: no 'Files given' / 'Files opened' count")
+        section = OPENED_SECTION.search(body)
+        if not section:
+            problems.append(f"{name}: no '## Files opened' section, so nothing says what was read")
             continue
-        if given.group(1) != claim.group(1):
-            problems.append(f"{name}: opened {claim.group(1)} of {given.group(1)} files given")
-        if len(listed) != int(claim.group(1)):
-            problems.append(f"{name}: claims {claim.group(1)} files opened but lists {len(listed)}")
+        # Only the one section is the evidence. A path named under Traps or
+        # Public surface was mentioned, not necessarily opened.
+        listed = re.findall(r"^\s*[-*]\s+`?([^\s`]+)`?\s*$", section.group(1), re.MULTILINE)
+        for entry in listed:
+            opened.setdefault(normalize(entry), []).append(name)
+
+        # The typed counts are the scanner's own claim. The list is the evidence
+        # and the walk below is the judge, so a disagreement is reported, not trusted.
+        for label in ("given", "opened"):
+            typed = re.search(rf"^files {label}:\s*(\d+)", body, re.IGNORECASE | re.MULTILINE)
+            if not typed:
+                warnings.append(f"{name}: no 'Files {label}' count")
+            elif int(typed.group(1)) != len(listed):
+                warnings.append(f"{name}: 'Files {label}: {typed.group(1)}' but the list names {len(listed)}")
 
     for path in sorted(opened):
         if is_secret(os.path.basename(path)):
@@ -290,8 +314,12 @@ def check_slices(slices_dir: str, srcs: list[str]) -> int:
     secrets: list[str] = []
     dotfiles: list[str] = []
     files = source_files(srcs, secrets, dotfiles)
+    if not files:
+        problems.append(f"no source files found under {', '.join(srcs)}, so the walk compared nothing")
     unread = [p for p in files if not any(p == o or p.endswith("/" + o) or o.endswith("/" + p) for o in opened)]
     print(f"  read: {len(files) - len(unread)} of {len(files)} source files, across {len(opened)} listed path(s)")
+    for warning in warnings:
+        print(f"  warning: {warning}")
     if secrets:
         print(f"  skipped as secret-bearing: {len(secrets)} file(s): {', '.join(sorted(secrets)[:5])}")
     if dotfiles:
@@ -309,8 +337,18 @@ def check_slices(slices_dir: str, srcs: list[str]) -> int:
     return fail(problems, "coverage")
 
 
-def emit_status(rows: list[Row], reviews_dir: str) -> int:
-    """The block that opens the report. Generated, so it cannot be phrased away."""
+def emit_status(rows: list[Row], reviews_dir: str, slices_dir: str, srcs: list[str]) -> int:
+    """The block that opens the report. Generated, so it cannot be phrased away.
+
+    Coverage runs inside it, because a status that read only the map and the
+    reviews printed DELIVERED for a run whose scanners never ran.
+    """
+    if srcs:
+        with contextlib.redirect_stdout(io.StringIO()):
+            coverage = "PASS" if check_slices(slices_dir, srcs) == 0 else "FAIL"
+    else:
+        coverage = "not run"
+
     counts = {"planned": 0, "drafted": 0, "reviewed": 0, "other": 0}
     for row in rows:
         counts[row["status"].lower() if row["status"].lower() in counts else "other"] += 1
@@ -330,14 +368,20 @@ def emit_status(rows: list[Row], reviews_dir: str) -> int:
                 failed += 1
 
     total = len(rows)
-    done = counts["reviewed"] == total and failed == 0 and missing == 0
+    done = counts["reviewed"] == total and failed == 0 and missing == 0 and coverage == "PASS"
 
     print("")
     print("    STATUS: " + ("DELIVERED" if done else "INCOMPLETE"))
     print(f"    Pages reviewed: {counts['reviewed']} of {total}")
     print(f"    Drafted, not reviewed: {counts['drafted']}    Planned, not written: {counts['planned']}")
     print(f"    Review verdicts: {passed} PASS, {failed} FAIL, {missing} missing")
+    print(f"    Coverage: {coverage}")
     print("")
+
+    if coverage == "not run":
+        print("    Coverage did not run: pass --src with the source roots the slices cover.")
+    elif coverage == "FAIL":
+        print("    Coverage failed: run check_docs.py coverage for the reasons.")
 
     if not done:
         print("    This set is not delivered. Report it as INCOMPLETE, lead with these")
@@ -484,10 +528,10 @@ def main() -> int:
         return emit_mermaid(rows)
 
     if args.gate == "status":
-        return emit_status(rows, args.reviews)
+        return emit_status(rows, args.reviews, args.slices, args.src)
 
     status = 0
-    if args.gate == "all" and args.src:
+    if args.gate == "all":
         status |= check_slices(args.slices, args.src)
     if args.gate in {"map", "all"}:
         status |= check_map(rows, excluded, args.src)

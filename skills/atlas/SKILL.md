@@ -33,10 +33,10 @@ Everything goes in `docs-work/` beside the documentation. Keep it as the audit t
 | Gate | Artifact | Check |
 | --- | --- | --- |
 | G0 scope | `docs-work/scope.md` | The user answered. Nothing is read in depth before it exists. |
-| G1 coverage | `docs-work/slices/*.md` | `check_docs.py coverage` passes: the union of every slice's file list equals a real walk of the tree. |
+| G1 coverage | `docs-work/slices/*.md` | `check_docs.py coverage` passes: the union of every slice's `## Files opened` list equals a real walk of the tree. It runs at every scope, one page included. |
 | G2 map | `docs-work/map.md` | `check_docs.py map` passes. **No page is written before it does.** |
 | G3 reviews | `docs-work/reviews/*.md` | `check_docs.py reviews` passes: every row reviewed, two `Verdict: PASS` each. A row still planned fails it. |
-| G4 delivery | `docs-work/report.md` | `check_docs.py status` says DELIVERED, `links` passes, and the project's own doc gates are green. The status block is pasted at the top of the report. |
+| G4 delivery | `docs-work/report.md` | `check_docs.py status --src <roots>` says DELIVERED, `links` passes, and the project's own doc gates are green. The status block is pasted at the top of the report. |
 | G5 finish | the run itself | `check_docs.py status` exits non-zero while any row is not `reviewed`. Wire it into the harness's stop condition, so ending the run early is refused rather than discouraged. In Claude Code, a `Stop` hook that runs it and exits non-zero while it fails is enough. |
 
 Run them with the bundled checker, which needs Python 3 and nothing else:
@@ -49,7 +49,7 @@ Where Python is unavailable, the four map invariants are still countable by hand
 
 **A gate that did not run has not passed.** Reporting a page as done without its two verdict files on disk is the failure this whole structure exists to make impossible.
 
-**The report opens with generated output, not with your account of the work.** Run `check_docs.py status` and paste its block verbatim as the first thing in `docs-work/report.md`. It prints DELIVERED or INCOMPLETE, pages reviewed out of total, and the verdict tally, so the first line the user reads is a number rather than a summary. A report that opens any other way is not a report, and prose cannot talk its way past a count it did not produce.
+**The report opens with generated output, not with your account of the work.** Run `check_docs.py status` and paste its block verbatim as the first thing in `docs-work/report.md`. It prints DELIVERED or INCOMPLETE, pages reviewed out of total, the verdict tally and the coverage result, so the first line the user reads is a number rather than a summary. A report that opens any other way is not a report, and prose cannot talk its way past a count it did not produce.
 
 **A set is delivered when every row is reviewed and every verdict passes. Nothing else is delivery.** Eight pages of a hundred and seventy-six is progress, and progress is reported as INCOMPLETE with the fraction, never as a pass. The words for it are "N of M", at the top, before anything you are pleased about.
 
@@ -107,7 +107,7 @@ Create one todo per phase and work them in order.
 
 **Phase 1: Map the terrain.** Cheap commands: tree, file counts, every manifest and config, existing documentation anywhere in the tree, recent `git log`. Then answer the seven toolchain questions from this repository into `docs-work/toolchain.md`, because every later verification depends on them. → `references/research.md`, `references/toolchain.md`, `references/project-types.md`
 
-**Phase 2: Read it as one system.** Entry points, at least two complete end-to-end traces, the data, the seams, the deliberate decisions. Cover 100% of non-test source, not a sample: count the files, cut the tree into slices, and fan the slices out in parallel as `agents/scanner.md`, each carrying `docs-work/toolchain.md`. → `references/research.md`
+**Phase 2: Read it as one system.** Entry points, at least two complete end-to-end traces, the data, the seams, the deliberate decisions. Cover 100% of non-test source, not a sample: count the files, cut the tree into slices, and fan the slices out in parallel as `agents/scanner.md`, each carrying `docs-work/toolchain.md`. The scanners run at every scope. A one-page scope still gets its slices and its coverage gate, because reading the source in the main session leaves no file list for the gate to check. → `references/research.md`
 
 **Phase 3: Verify before you claim.** Scripts, environment variables, commands, versions, endpoints, check each against the code rather than against the old docs. → `references/research.md`
 
