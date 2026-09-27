@@ -28,7 +28,7 @@ Three commitments hold it together.
 
 A rule in a skill file is a promise, and a broken promise costs nothing. Each phase below therefore ends in a file on disk, and four of them end in a command that can reject the work.
 
-Everything goes in `docs-work/` beside the documentation. Keep it as the audit trail for every claim delivered, or offer to remove it at the end.
+Everything goes in `docs-work/` beside the documentation. Keep it as the audit trail for every claim delivered, or offer to remove it at the end. Kept, it is published with the documentation, so it follows the same rules as a page: a decision is credited to a role ("the owner"), never to a person's name, and it carries no IP address, device name or credential. Search it for names before the commit.
 
 | Gate | Artifact | Check |
 | --- | --- | --- |
