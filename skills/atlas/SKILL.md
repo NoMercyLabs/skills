@@ -8,7 +8,7 @@ compatibility: >-
   with a model per role. Tested in Claude Code.
 metadata:
   author: NoMercy Labs
-  version: "1.0.3"
+  version: "1.1.0"
   homepage: https://github.com/NoMercyLabs/skills/tree/main/skills/atlas
 ---
 
@@ -36,7 +36,7 @@ Everything goes in `docs-work/` beside the documentation. Keep it as the audit t
 | G1 coverage | `docs-work/slices/*.md` | `check_docs.py coverage` passes: the union of every slice's `## Files opened` list equals a real walk of the tree. It runs at every scope, one page included. |
 | G2 map | `docs-work/map.md` | `check_docs.py map` passes. **No page is written before it does.** |
 | G3 reviews | `docs-work/reviews/*.md` | `check_docs.py reviews` passes: every row reviewed, two `Verdict: PASS` each. A row still planned fails it. |
-| G4 delivery | `docs-work/report.md` | `check_docs.py status --src <roots>` says DELIVERED, `links` passes, and the project's own doc gates are green. The status block is pasted at the top of the report. |
+| G4 delivery | `docs-work/report.md` | `check_docs.py status --src <roots>` says DELIVERED, `links` and `style` pass, and the project's own doc gates are green. The status block is pasted at the top of the report. |
 | G5 finish | the run itself | `check_docs.py status` exits non-zero while any row is not `reviewed`. Wire it into the harness's stop condition, so ending the run early is refused rather than discouraged. In Claude Code, a `Stop` hook that runs it and exits non-zero while it fails is enough. |
 
 Run them with the bundled checker, which needs Python 3 and nothing else:
@@ -125,7 +125,7 @@ Create one todo per phase and work them in order.
 
 Investigation must not change the project. Only three kinds of write are allowed: the backup, the new documentation, and `docs-work/`.
 
-**One deliberate exception: a bug the documentation work reveals gets fixed, not written up.** If a documented option is never read, a binding never fires, or a method silently no-ops, the fix belongs in the code, with a regression test proven to fail without it. Writing "note: this does not currently work" ships a disclaimer where a fix was possible. Do not wander into unrelated refactors.
+**A defect or a missing capability the documentation work reveals becomes an issue, filed at once.** If a documented option is never read, a binding never fires, a method silently no-ops, or the design plainly lacks a hook a reader will need, open an issue on the repository that owns that code, with the file and line, what the code does, and what it should do. Where another repository mirrors or ports the same code, it gets its own issue too. Changing behavior is the owner's decision and a separate change with its own test, so the documentation run does not make it. The page documents what the code does today: the broken option is left out rather than described, and no page ships "note: this does not currently work". Record every issue in `docs-work/issues.md` with its link, and list them in the report. Only the documentation is fixed in place.
 
 **A run does not edit this skill.** Finding a defect in these instructions is expected and valuable, and changing them mid-run is not. The rules would then differ between the page reviewed at the start and the page reviewed at the end, with nothing on either verdict saying which version judged it. A session deep in one repository also writes rules shaped by that repository, which is how a portable skill stops being portable.
 

@@ -179,5 +179,42 @@ class StatusTests(unittest.TestCase):
         self.assertIn("Coverage: PASS", out)
 
 
+
+class StyleTests(unittest.TestCase):
+    """`style`: a heading that mixes words with a code span."""
+
+    def check(self, body: str) -> tuple[int, str]:
+        work = Workdir({"docs/page.md": body})
+        try:
+            return run(check_docs.check_style, "docs")
+        finally:
+            work.close()
+
+    def test_code_span_in_a_prose_heading_fails(self):
+        code, out = self.check("# Page\n\n## What `fetch` applies\n\nText.\n")
+        self.assertEqual(code, 1)
+        self.assertIn("code span in a heading", out)
+
+    def test_plain_heading_passes(self):
+        code, _ = self.check("# Page\n\n## What fetch applies\n\nThe `fetch` call applies it.\n")
+        self.assertEqual(code, 0)
+
+    def test_member_heading_passes(self):
+        code, _ = self.check("# Methods\n\n### `addListener`\n\n### `seek(seconds)`\n")
+        self.assertEqual(code, 0)
+
+    def test_two_spans_in_a_heading_fail(self):
+        code, _ = self.check("# Page\n\n### `on` and `off`\n")
+        self.assertEqual(code, 1)
+
+    def test_headings_inside_code_are_ignored(self):
+        code, _ = self.check("# Page\n\n```md\n## What `x` does\n```\n")
+        self.assertEqual(code, 0)
+
+    def test_frontmatter_is_ignored(self):
+        code, _ = self.check("---\ntitle: What `x` does\n---\n\n# Page\n")
+        self.assertEqual(code, 0)
+
+
 if __name__ == "__main__":
     unittest.main()

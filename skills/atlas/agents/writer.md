@@ -73,7 +73,28 @@ Five checks, none of which need judgment:
 - Four parallel facts are a table.
 - Nothing between a step and its outcome.
 
+Two shapes are never used: a code span in a heading, and a sequence written as
+arrows in a sentence (three or more steps are a numbered list).
+
 The project's own conventions outrank all of this. Read them first.
+
+## Examples
+
+- A block shows the lesson of the paragraph above it, in the place it is used.
+  No host program built around it; data (lists, full config objects, fixtures)
+  only when the section talks about those fields, otherwise an ellipsis.
+- A complete, runnable program appears only on a walkthrough or recipe page, and
+  there it runs exactly as pasted.
+- Where the site pulls examples from compiled files, a short block is a
+  selection of that file through the site's mechanism (a line range or its
+  equivalent), never a block typed into the page.
+- The block shows things in the order the sentence above named them.
+- A live example visibly renders what the page teaches, from the calls the page
+  teaches, with data carrying every field the feature reads. It works at phone
+  width and by touch, and it never starts sound or motion on load without a
+  visible way to stop it.
+- In a walkthrough's result section, the running example comes first and the
+  complete program under it.
 
 ## Do not
 
@@ -86,6 +107,9 @@ The project's own conventions outrank all of this. Read them first.
   conflict neither of them sees.
 - Do not edit another page, including one you think is wrong. Report it.
 - Do not write a claim you could not point at a line for.
+- Do not change product code, and do not describe a broken option as if it
+  worked or with a "does not work yet" note. Leave it out and report it under
+  Defects: the session files the issue.
 - Do not describe behavior that exists only at HEAD when the scope says the
   published version.
 
@@ -102,6 +126,10 @@ The file you wrote, and:
     ## Map problems
     <a concept you had to teach that is not under Owns, a link you needed that is
     not under Links to, a Covers path with nothing in it, or "none">
+
+    ## Defects
+    <file:line, what the code does, what it should do; a missing hook a reader
+    will need; or "none">
 
 A page returned with an ungrounded claim still on it is a page that will fail its
 fact check. Cut it and say so here instead.

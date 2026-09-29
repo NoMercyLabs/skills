@@ -6,6 +6,8 @@ Write in the language the project's own documentation and code comments use, reg
 
 Apply them to identifiers in examples too, not only to prose. A reader copies the identifier, and a spelling that disagrees with the codebase spreads from the page into their project.
 
+A name that crosses a wire is written exactly as the code sends it, in prose as well as in code: a header key the client sends in lowercase is lowercase in the sentence too, never title-cased because it starts a phrase. Where the site can mark what kind of token inline code is, a string value, a type, a function, a key, mark it: a string that renders in the identifier color reads as a name the reader should type bare.
+
 Code in the documentation is held to the same shape as code in the repository, because a reader copies it and because a cramped snippet is exactly as hard to scan as a cramped source file. Format every example the way the project's own formatter and lint config would, never the compact form that fits a chat message. Vertical space carries meaning, so a snippet gets blank lines between its logical steps rather than being packed tight. A guard clause is always followed by a blank line, because the guard and the work it protects are two thoughts and running them together is what makes a short function look dense. Setup, action and assertion separate the same way. The reader should be able to see how many steps a snippet has before reading any of them, which is the same reason prose here gets short paragraphs with space between them: a wall is hard to enter regardless of whether it is made of sentences or statements.
 
 Where the project ships a formatter, run it over the extracted snippets rather than imitating it by eye. It settles every question it has an opinion about, and it settles them the way the project already answered them.
@@ -26,7 +28,12 @@ Five things make the difference, and each one is checkable without judgment:
 
 Long is not the problem. A page of short paragraphs can be long and still read easily. A single paragraph of six joined sentences cannot, however true every one of them is.
 
-Three more that cost nothing to hold. No filler opener that restates the heading. A page states what is true now and never narrates what changed, so no "previously", "superseded by", or "used to". Never document a non-functional option: fix it or leave it out.
+Two shapes the eye trips on:
+
+- **A prose heading is plain words.** A heading that mixes words with a code span, "What `fetch` applies", renders as a stray box in the navigation, the table of contents and the anchor. Name the thing in words and put the identifier in the first sentence under it. A member heading on a reference page is the one exception: a heading that is only the member's name, as a single code span, is the house shape for a surface. `check_docs.py style` fails the first and passes the second.
+- **A sequence is shown as a sequence, never as bare arrow characters in plain text.** Steps the reader performs are a numbered list; a flow with branches is a diagram. A short chain inside a sentence, a menu path or an event cycle, uses the site's own sequence rendering where it has one, so the separator is drawn and announced rather than typed.
+
+Three more that cost nothing to hold. No filler opener that restates the heading. A page states what is true now and never narrates what changed, so no "previously", "superseded by", or "used to". Never document a non-functional option: leave it out and file the issue (see the operating boundary in `SKILL.md`).
 
 The audience is deliberately mixed: someone joining the project, someone maintaining it a year from now, someone just trying to run it, and someone integrating against it. Serve them by separating concerns into documents with a single job each, rather than by writing one document that hedges between audiences.
 
@@ -87,6 +94,25 @@ Sort the inventory into what the site can do that plain text cannot: run an exam
 
 Where the project can render a live example, a page teaching a visible feature uses it rather than a fenced block, because the reader can then watch the thing run. Write the example as a real file in whatever directory the project compiles, so the build proves it, and reference it from the page.
 
+### An example shows the lesson of its section, nothing else
+
+A block sits under a paragraph that explains one thing, and the block shows that thing in the place it is used. Everything else in the program is either absent or an ellipsis.
+
+- **No scaffolding.** A page about a hook does not first build a host application to hang the hook on. The reader already has one; show the hook where it goes, with the enclosing call as the anchor.
+- **Data only when it is the subject.** A list of records, a full configuration object, a fixture with every optional field: shown only where the section talks about those fields. Anywhere else it is an ellipsis or one short entry. A forty-line dataset above a three-line lesson buries the lesson and implies the reader must supply all forty lines.
+- **Complete, copy-paste programs belong to two page shapes only**: the walkthrough that builds something step by step, and the recipe a reader applies as-is. There they must run exactly as pasted. Concept, handbook and reference pages do not end in a full program.
+- **Truncate from the compiled file, never from a hand copy.** Where the site pulls examples from files the build compiles, a short block is a selection of that file, by line range or by the site's own mechanism, never a block retyped into the page. A retyped block stops being checked the day it is written. Where the selection is by line range, the site needs a guard that fails the build when an edit to the file moves the range; a range that silently slides shows the wrong lines with a green build. Region markers written into the example file to fence a snippet are the weaker form: they put page structure inside program source.
+
+### A live example shows its subject
+
+A live example is judged by what the reader sees, not by whether it mounts.
+
+- **It visibly renders the feature the page teaches.** A page about chapters whose demo is a stock player with a chapter list in its data shows nothing about chapters: the data is there and the reader cannot see it. The demo draws what the page is about, the segments, the level picker, the counter, the list, from the same calls the page teaches.
+- **Its data carries every field the feature reads.** A preview feature fed an item without its preview source mounts cleanly and shows nothing, on every device.
+- **It works where readers are.** Phone width, touch input, keyboard. A control written for a mouse, a hover-only preview, a drag that ends on `mouseup` alone, is broken for most readers of a docs page, and a load check will never notice.
+- **It never plays on its own without a visible way to stop it.** No sound or motion starts on load unless the demo shows its own start and stop, or the platform's controls. A page is often opened in a quiet room.
+- **It starts compact.** A control strip laid over the demo fits a phone-sized frame in one row, or scrolls, rather than covering the thing it controls.
+
 ### One page, one job
 
 A reader who lands on a topic should find it whole, not half of it in two places. Three tiers, and every page does exactly one of them:
@@ -122,6 +148,8 @@ A page that takes someone from nothing to a working result, a quickstart, a setu
 **The outcome sentence has one shape, and it is marked.** A reader scanning for "did that work" should find the answer without reading the step again, so the sentence naming the result is written the same way every time, second person, present tense, about what is now on their screen, and visually distinct from the prose around it. Once it has a silhouette they can skip everything else and still check themselves at every step. Where the step can fail visibly, the symptoms follow immediately and each names its cause: one sentence per way it goes wrong, in the order the reader would meet them.
 
 **Steps are numbered and headed by the action.** A heading that names what the reader does, install it, give it a container, wait for it, lets someone returning to the page find the step they are on without reading. Numbers matter for the same reason a later step can then say which earlier one it modifies, by number, instead of by description.
+
+**The result section shows the result first.** Where a walkthrough ends in a section that runs what was built, the running example comes straight under its heading, and the complete program follows it. The steps above already taught every part; putting the full listing first makes the reader scroll past everything they just read to reach the one thing the section promised.
 
 **Name the exit ramp.** A walkthrough that adds capability in layers passes several points where a particular reader already has what they came for, and saying so is not an admission that the rest is optional padding. It respects that they came with a smaller problem than the page solves. One clause is enough, at the point it becomes true.
 
@@ -201,6 +229,8 @@ When consecutive sentences each name a different value of the same thing, that i
 **Every member gets its own heading.** A method mentioned only inside a sentence about a different method is undocumented. If it has a name a reader will type, it is a section, not a clause. Uneven depth across a surface reads as "the author knew three of these well."
 
 **Order so the page only ever refers backward.** Introduce each member once, in a sequence where nothing needs a member the reader has not met. When a section has to send the reader back to an earlier one, the order is wrong, not the wording. Behavior that belongs to two members lives with the one that owns it: how to remove a one-shot subscription belongs under the one-shot method, not inside the removal method, or the page zig-zags between them.
+
+**The example follows the order the prose introduced.** A sentence that presents a getter and then a setter is followed by a block that shows the getter and then the setter. Reversed, the reader maps the first line of code to the first thing named and reads each backwards.
 
 **A passing reference to a second system is a decision, not a phrase.** Scene-setting sentences hide whole subsystems: "the server announces every state change" was standing in for a state machine with its own vocabulary, its own event payload, and behavior a reader must know to use it. Every time you write a clause like that, decide which it is. Trivial enough to state in full, right there, in a sentence that actually says the thing. Or a system in its own right, in which case it earns a page and this becomes a link. What is never acceptable is the third option, where the clause implies the reader already understands something the docs never explain anywhere.
 

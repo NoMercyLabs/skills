@@ -42,7 +42,8 @@ Before delivering, go through the docs once more as a whole rather than as separ
 - **Coverage**: `check_docs.py map` accounts for every source path, either as a page's responsibility or as an excluded entry carrying its reason. Read the excluded list back to the user at delivery, because it is the part they may disagree with.
 - **The onboarding test**: could someone follow `getting-started.md` from scratch, on a clean machine, without asking a single question? Where the answer is no, that is the next thing to fix.
 - **The project's own gates**: when the project ships documentation checks, they are the acceptance criteria, not an afterthought. Run every one and leave them green. Check which of them the build actually invokes, because a check that exists and is not wired into the build has been passing by not running, and the drift it was written to catch is already there. Report an unwired gate rather than wiring it: what runs in someone's build is their decision. A docs site commonly carries checks for link resolution, navigation placement, example compilation, prose rules and density; a page that fails them is not finished no matter how it reads.
-- **Rendered, not inferred**: look at the built page, not only the source. Color, spacing and table behavior are decided by CSS and a syntax theme, and neither is visible in Markdown. Where the project deploys, check the deployed URL rather than a local preview.
+- **Rendered, not inferred**: look at the built page, not only the source. Color, spacing and table behavior are decided by CSS and a syntax theme, and neither is visible in Markdown. Where the project deploys, check the deployed URL rather than a local preview. Look at a phone width as well as a desktop one: tables, cards and code blocks break there first.
+- **Used, not loaded**: every live example is operated, not just mounted. At phone width and with touch input, perform the interaction the page teaches, drag, tap, pick, switch, and confirm the result the page describes appears. "It reached ready" proves the page did not crash, nothing more. Run these checks muted, and stop and close every example afterwards: a check that plays sound through someone's speakers is a defect of the check.
 
 ## Reporting back
 
@@ -53,5 +54,10 @@ Tell the user, briefly:
 - Where the backup of the old documentation is
 - **Mismatches found between old docs and code**: this is often the most valuable output of the whole exercise
 - Open questions and anything that could not be verified, so they know exactly what still needs a human
+- The issues filed for defects and missing capabilities, one link each (`docs-work/issues.md`)
+
+**Links go where the user will look.** A link handed to the user points at the site they will open, the deployed or preview URL, fetched in this run and showing the version you describe. A local address only works on one machine, and a link meant to be passed on to someone else must work for them. Say plainly which pages are live in the new version and which wait on a deploy.
+
+**Only reviewed work is recommended.** When the user asks for the best pages to show, choose from pages that passed both reviews in this run, and say why each one is strong. A page that is long, or loads, or happens to exist is not evidence of quality, and one the user has not seen yet is labeled as unreviewed.
 
 Keep this short and factual. The documentation is the deliverable; the report just tells them where to look and what to double-check.

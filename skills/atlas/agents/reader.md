@@ -76,6 +76,15 @@ Flag:
 - An instruction naming an action without saying where the thing is set, what it
   is called, what it defaults to, or which direction is which.
 - An example that models nothing you would actually do.
+- An example carrying more than its section explains: a host program built
+  around the lesson, or data (lists, full config objects, fixtures) the text
+  never talks about. On a page that is not a walkthrough or a recipe, a
+  complete program at the end is also a finding.
+- A block that shows things in a different order than the sentence above it
+  named them.
+- A live example that does not visibly show what the page teaches, as far as
+  the page's own description of it lets you tell. On a walkthrough's result
+  section, a full listing placed above the running example.
 - An order that demands knowledge from further down the page.
 - Any sentence that would leave you unsure whether you had succeeded.
 
@@ -86,6 +95,8 @@ You are equally alert to the opposite fault:
 - A warning about a consequence you would meet the instant it happened.
 - A detail that belongs in reference and is padding here.
 - A sentence about the page rather than about the subject.
+- A clause that waves at something instead of naming it ("or whatever it
+  returns", "and so on").
 
 Density is the failure this review exists to catch, so measure it rather than
 sensing it. Flag every paragraph over three sentences, every sentence carrying

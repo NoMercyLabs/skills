@@ -9,6 +9,7 @@ promise to honor. Nothing in it knows anything about a particular project.
     check_docs.py map     --map docs-work/map.md --src src
     check_docs.py reviews --map docs-work/map.md --reviews docs-work/reviews
     check_docs.py links   --map docs-work/map.md --docs docs
+    check_docs.py style   --docs docs
     check_docs.py mermaid --map docs-work/map.md
     check_docs.py all      --map docs-work/map.md --src src --docs docs
 
@@ -490,6 +491,48 @@ def check_links(rows: list[Row], docs_root: str) -> int:
     return fail(problems, "links")
 
 
+HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+FENCE = re.compile(r"^\s*(```|~~~)")
+MEMBER_HEADING = re.compile(r"^`[^`]+`$")
+
+
+def check_style(docs_root: str) -> int:
+    """A heading that mixes words with a code span. A heading that is only one
+    code span is a member heading on a reference page and passes. Fenced code
+    and front matter are not prose and are skipped."""
+    problems: list[str] = []
+    checked = 0
+
+    for base, dirs, names in os.walk(docs_root):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
+        for name in names:
+            if not name.endswith((".md", ".mdx")):
+                continue
+            path = os.path.join(base, name)
+            checked += 1
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                lines = handle.read().splitlines()
+
+            in_fence = False
+            in_front = bool(lines) and lines[0].strip() == "---"
+            for number, line in enumerate(lines, start=1):
+                if in_front:
+                    if number > 1 and line.strip() == "---":
+                        in_front = False
+                    continue
+                if FENCE.match(line):
+                    in_fence = not in_fence
+                    continue
+                if in_fence:
+                    continue
+                heading = HEADING.match(line)
+                if heading and "`" in heading.group(2) and not MEMBER_HEADING.match(heading.group(2)):
+                    problems.append(f"{path}:{number}: code span in a heading: {line.strip()}")
+
+    print(f"  style: {checked} page(s) checked")
+    return fail(problems, "style")
+
+
 def emit_mermaid(rows: list[Row]) -> int:
     print("```mermaid")
     print("graph TD")
@@ -509,8 +552,12 @@ def emit_mermaid(rows: list[Row]) -> int:
 
 
 def main() -> int:
+    # Findings quote page text, which carries characters a Windows console
+    # code page cannot encode; printing one must not crash the gate.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("gate", choices=["status", "coverage", "map", "reviews", "links", "mermaid", "all"])
+    parser.add_argument("gate", choices=["status", "coverage", "map", "reviews", "links", "style", "mermaid", "all"])
     parser.add_argument("--map", default="docs-work/map.md")
     parser.add_argument("--src", nargs="*", default=[])
     parser.add_argument("--docs", default=None)
@@ -520,6 +567,12 @@ def main() -> int:
 
     if args.gate == "coverage":
         return check_slices(args.slices, args.src)
+
+    if args.gate == "style":
+        if not args.docs:
+            print("style needs --docs")
+            return 2
+        return check_style(args.docs)
 
     rows, excluded = parse_map(args.map)
     print(f"{args.map}: {len(rows)} page(s), {len(excluded)} excluded path(s)")
@@ -539,6 +592,8 @@ def main() -> int:
         status |= check_reviews(rows, args.reviews)
     if args.gate in {"links", "all"} and args.docs:
         status |= check_links(rows, args.docs)
+    if args.gate == "all" and args.docs:
+        status |= check_style(args.docs)
     return status
 
 

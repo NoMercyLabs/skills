@@ -78,6 +78,8 @@ A correction is also where the opposite mistake starts. Told that something is t
 
 **Never write a sentence about the page.** "Every step here matters", "this guide is practical", "nothing below is optional", "read this before continuing", these describe the document rather than the subject, and they claim a virtue every page already claims by existing. No reader believes a page is padded because it failed to deny it, so the denial only adds padding. The same goes for narrating the structure: which section is most important, what the last few steps are for, how long this will take. A page earns those impressions by being ordered well; asserting them spends the reader's first paragraph on nothing. Open on the subject, and let the first real sentence be about the thing being documented.
 
+**Name the thing; never wave at it.** "Or whatever the parser returns", "and so on", "some kind of handler": each tells the reader the writer did not look. Name the return type, the full set, the handler, or cut the clause. A common noun in running text stays lowercase ("the parser"); capitals belong only to the exact name of a type or product, written as it appears in the code.
+
 **Spend depth unevenly.** Expand where a reader would otherwise guess wrong; compress everywhere else. Bloat is not length, it is length that does not change what the reader can do.
 
 **Cap a reasoning chain at two links, unless the chain is the subject.** "The listener holds the element, the element holds the document, and the document holds every image, script and stylesheet it loaded" is correct and unreadable, and the reader wanted the consequence rather than the derivation.
