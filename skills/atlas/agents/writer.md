@@ -91,8 +91,8 @@ The project's own conventions outrank all of this. Read them first.
 - The block shows things in the order the sentence above named them.
 - A live example visibly renders what the page teaches, from the calls the page
   teaches, with data carrying every field the feature reads. It works at phone
-  width and by touch, and it never starts sound or motion on load without a
-  visible way to stop it.
+  width and by touch, and it starts nothing noticeable on load (sound, motion,
+  a notification) without a visible way to stop it.
 - In a walkthrough's result section, the running example comes first and the
   complete program under it.
 

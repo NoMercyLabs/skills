@@ -200,7 +200,7 @@ class StyleTests(unittest.TestCase):
         self.assertEqual(code, 0)
 
     def test_member_heading_passes(self):
-        code, _ = self.check("# Methods\n\n### `addListener`\n\n### `seek(seconds)`\n")
+        code, _ = self.check("# Methods\n\n### `addListener`\n\n### `resize(width)`\n")
         self.assertEqual(code, 0)
 
     def test_two_spans_in_a_heading_fail(self):

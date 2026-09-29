@@ -107,11 +107,11 @@ A block sits under a paragraph that explains one thing, and the block shows that
 
 A live example is judged by what the reader sees, not by whether it mounts.
 
-- **It visibly renders the feature the page teaches.** A page about chapters whose demo is a stock player with a chapter list in its data shows nothing about chapters: the data is there and the reader cannot see it. The demo draws what the page is about, the segments, the level picker, the counter, the list, from the same calls the page teaches.
-- **Its data carries every field the feature reads.** A preview feature fed an item without its preview source mounts cleanly and shows nothing, on every device.
-- **It works where readers are.** Phone width, touch input, keyboard. A control written for a mouse, a hover-only preview, a drag that ends on `mouseup` alone, is broken for most readers of a docs page, and a load check will never notice.
-- **It never plays on its own without a visible way to stop it.** No sound or motion starts on load unless the demo shows its own start and stop, or the platform's controls. A page is often opened in a quiet room.
-- **It starts compact.** A control strip laid over the demo fits a phone-sized frame in one row, or scrolls, rather than covering the thing it controls.
+- **It visibly renders the feature the page teaches.** A page about validation whose demo is a plain form that never shows an error teaches nothing: the rules are in the code and the reader cannot see them fire. The demo makes the page's subject appear on screen, from the same calls the page teaches.
+- **Its data carries every field the feature reads.** A feature handed data without the field it reads mounts cleanly and renders nothing, on every device, and a build that only checks mounting stays green.
+- **It works where readers are.** Phone width, touch input, keyboard. A control written for one input only, a hover-only hint, a drag that finishes on a mouse event alone, is broken for many readers, and a load check will never notice.
+- **It starts nothing a nearby person notices without a visible way to stop it.** Sound, motion, a notification, a window: none begins on load unless the demo shows how to stop it. A page is often opened in a quiet room.
+- **Its own controls stay small.** Controls laid over a demo fit a phone-sized frame, in one row or scrolling, rather than covering the thing they control.
 
 ### One page, one job
 
@@ -264,7 +264,7 @@ Say which outcomes are independent, too. Two calls that appear together in an ex
 
 **An example models a situation, not a signature.** A snippet that calls a method and immediately undoes it proves the call compiles and teaches nothing: subscribing with a one-shot and unsubscribing on the next line is code nobody writes. Show the case a reader is actually in. For a one-shot that is removed early, the situation is that the event may never arrive and the view is closing anyway. When the only honest example is contrived, the sentence was enough on its own, so write the sentence and skip the snippet.
 
-Where the example depends on something the code cannot express, one comment line supplies it. Two calls that happen at different moments look simultaneous on the page, and a line like `// The viewer left before playback ever started.` is the difference between a demonstration and a use case. That is the bar for a comment in an example: it carries context the reader cannot get from the code, never a restatement of what the next line does.
+Where the example depends on something the code cannot express, one comment line supplies it. Two calls that happen at different moments look simultaneous on the page, and a line like `// The user closed the dialog before the request ever returned.` is the difference between a demonstration and a use case. That is the bar for a comment in an example: it carries context the reader cannot get from the code, never a restatement of what the next line does.
 
 **When a structure holds more than one shape, label the shapes inside the code.** A list that accepts either a bare value or a wrapped one, a config key taking a string or an object, a union of any kind: shown without labels, the members sit adjacent and read as an inconsistency rather than a choice, and the honest reaction is that the example contains a typo. A blank line between the forms separates them; a short comment on each says which case it is. Explaining the split in prose underneath is weaker, because it asks the reader to hold the code in mind while they read about it, and it is invisible to the many people who take everything they need from the snippet and never read the paragraph. Put the distinction where the distinction is, and drop the prose that would have restated it.
 

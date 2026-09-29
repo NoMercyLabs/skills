@@ -8,7 +8,7 @@ compatibility: >-
   with a model per role. Tested in Claude Code.
 metadata:
   author: NoMercy Labs
-  version: "1.1.0"
+  version: "1.1.1"
   homepage: https://github.com/NoMercyLabs/skills/tree/main/skills/atlas
 ---
 
