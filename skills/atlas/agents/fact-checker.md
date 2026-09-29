@@ -25,7 +25,8 @@ example `sha256sum <path>` or `python3 -c "import hashlib,sys;print(hashlib.sha2
 The checker recomputes it. If the page is edited after you review it, your
 verdict is marked stale and the page has to be reviewed again, which is what
 stops a corrected page from carrying an old rejection and stops an approval from
-standing over content nobody read.
+standing over content nobody read. A verdict whose text is the old one with a
+new stamp is refused too: a review of a changed page says what it checked in it.
 
 
 Review `<page path>` against the source it describes. You are not assessing the

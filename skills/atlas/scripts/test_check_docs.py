@@ -6,6 +6,7 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -177,6 +178,66 @@ class StatusTests(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("STATUS: DELIVERED", out)
         self.assertIn("Coverage: PASS", out)
+
+
+class ReviewTests(unittest.TestCase):
+    """`reviews`: a verdict must judge the current page, and a new stamp needs a new review."""
+
+    def setUp(self) -> None:
+        self.work = Workdir({"docs/guide.md": "# Guide\n\nThe first version.\n"})
+        self.work.write("docs-work/map.md", MAP)
+        for kind in ("factcheck", "reader"):
+            self.verdict(kind, "Checked the first version.")
+        self.rows, _ = check_docs.parse_map("docs-work/map.md")
+
+    def tearDown(self) -> None:
+        self.work.close()
+
+    def verdict(self, kind: str, text: str) -> None:
+        digest = check_docs.page_digest("docs/guide.md")
+        self.work.write(
+            f"docs-work/reviews/guide.{kind}.md",
+            f"# Review\nVerdict: PASS\nReviewed: docs/guide.md\nReviewed-SHA: {digest}\n\n{text}\n",
+        )
+
+    def commit(self) -> None:
+        for args in (
+            ["init", "-q"],
+            ["add", "-A"],
+            ["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "reviewed"],
+        ):
+            subprocess.run(["git", *args], cwd=self.work.root, check=True, capture_output=True)
+
+    def reviews(self) -> tuple[int, str]:
+        return run(check_docs.check_reviews, self.rows, "docs-work/reviews")
+
+    def test_fresh_verdicts_pass(self) -> None:
+        code, out = self.reviews()
+        self.assertEqual(code, 0, out)
+
+    def test_a_page_edited_after_its_review_is_stale(self) -> None:
+        self.work.write("docs/guide.md", "# Guide\n\nThe second version.\n")
+        code, out = self.reviews()
+        self.assertEqual(code, 1, out)
+        self.assertIn("stale", out)
+
+    def test_a_verdict_that_only_changed_its_stamp_fails(self) -> None:
+        self.commit()
+        self.work.write("docs/guide.md", "# Guide\n\nThe second version.\n")
+        self.verdict("factcheck", "Checked the second version.")
+        self.verdict("reader", "Checked the first version.")
+        code, out = self.reviews()
+        self.assertEqual(code, 1, out)
+        self.assertIn("reader review only changed its stamp", out)
+        self.assertNotIn("factcheck review only changed its stamp", out)
+
+    def test_a_new_review_of_the_changed_page_passes(self) -> None:
+        self.commit()
+        self.work.write("docs/guide.md", "# Guide\n\nThe second version.\n")
+        for kind in ("factcheck", "reader"):
+            self.verdict(kind, "Checked the second version.")
+        code, out = self.reviews()
+        self.assertEqual(code, 0, out)
 
 
 

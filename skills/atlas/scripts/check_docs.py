@@ -24,6 +24,7 @@ import hashlib
 import io
 import os
 import re
+import subprocess
 import sys
 
 TIERS = {"introduce", "quickstart", "examples", "reference", "catalog"}
@@ -404,6 +405,44 @@ def page_digest(path: str) -> str | None:
         return None
 
 
+STAMP_LINE = re.compile(r"^(verdict|reviewed|reviewed-sha):.*$", re.IGNORECASE | re.MULTILINE)
+
+
+def restamped(path: str, body: str, digest: str) -> bool:
+    """True when the last version of this verdict that judged another page digest
+    says the same thing apart from its stamp lines.
+
+    A stamp proves which version a verdict names, not that anyone read it. A
+    reviewer handed a stale verdict can copy it and paste the new digest, and the
+    digest check then passes a review that never happened. A real review of a
+    changed page writes down what it checked in the new version, so its text
+    differs from the old one. Needs git history; outside a git work tree there is
+    nothing to compare against, and the check is skipped.
+    """
+    folder, name = os.path.split(os.path.abspath(path))
+
+    def git(*args: str) -> str | None:
+        try:
+            done = subprocess.run(["git", *args], cwd=folder, capture_output=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return done.stdout.decode("utf-8", errors="replace") if done.returncode == 0 else None
+
+    commits = git("log", "--format=%H", "--", name)
+    if not commits:
+        return False
+    stamp_free = STAMP_LINE.sub("", body).strip()
+    for commit in commits.split():
+        old = git("show", f"{commit}:./{name}")
+        if old is None:
+            continue
+        old_digest = re.search(r"^reviewed-sha:\s*([0-9a-f]{16})\s*$", old, re.IGNORECASE | re.MULTILINE)
+        if old_digest and old_digest.group(1).lower() == digest:
+            continue
+        return STAMP_LINE.sub("", old).strip() == stamp_free
+    return False
+
+
 def check_reviews(rows: list[Row], reviews_dir: str) -> int:
     """Delivery gate. A page still planned is unwritten work, not a note to keep.
 
@@ -449,6 +488,11 @@ def check_reviews(rows: list[Row], reviews_dir: str) -> int:
             elif current != digest.group(1).lower():
                 problems.append(
                     f"{row['page']}: {kind} review is stale: the page changed after it was written. Review it again."
+                )
+            elif restamped(path, body, current):
+                problems.append(
+                    f"{row['page']}: {kind} review only changed its stamp since it judged an older version. "
+                    f"A review of the changed page says what it checked in it. Review it again."
                 )
     return fail(problems, "reviews")
 
