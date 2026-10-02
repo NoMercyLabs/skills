@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 from unittest import mock
 
@@ -14,9 +15,26 @@ CHANGE = f'{PY} -c "open(\'lib.py\', \'w\').write(\'FIXED\')"'
 PROOF = f'{PY} -c "import sys; sys.exit(0 if open(\'lib.py\').read() == \'FIXED\' else 1)"'
 
 
+EMAIL = "dev@example.test"
+
+
+def git(repo, *args):
+    done = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, timeout=60)
+    assert done.returncode == 0, done.stderr
+    return done.stdout.strip()
+
+
 class BlockerCase(CrucibleCase):
     def setUp(self):
         self.root, self.repo = self.make_root(FILES)
+        self.remote = os.path.join(self.tmp(), "remote.git")
+        git(self.repo, "init", "-q")
+        git(self.repo, "config", "user.name", "Dev User")
+        git(self.repo, "config", "user.email", EMAIL)
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-q", "-m", "start")
+        git(self.repo, "init", "-q", "--bare", self.remote)
+        git(self.repo, "remote", "add", "origin", self.remote)
         cfg = Root(self.root).config()
         cfg["repos"][0]["remote"] = "git@host.test:acme/svc.git"
         Root(self.root).save_config(cfg)
@@ -31,11 +49,13 @@ class BlockerCase(CrucibleCase):
             return f"https://host.test/acme/svc/pull/{len(self.gh_calls)}\n"
         raise AssertionError(f"unexpected gh call {args}")
 
-    def allow(self, mode="within_limits", grant=True, **extra):
+    def allow(self, mode="within_limits", grant=True, push=True, **extra):
         words = ["--words", "test words"]
         self.assertEqual(run(self.root, "answer", "blocker_fixes", json.dumps({"mode": mode, **extra}), *words)[0], 0)
         if grant:
             self.assertEqual(run(self.root, "grant", "blocker_fixes", "yes", "--reopen", *words)[0], 0)
+        if push:
+            self.assertEqual(run(self.root, "grant", "blocker_pushes", "yes", "--reopen", *words)[0], 0)
 
     def add(self, text="the readers cannot load the module", stage="inventory"):
         code, out, err = run(self.root, "blocker", "add", text, "--stage", stage)
@@ -161,6 +181,54 @@ class FixLandingTests(BlockerCase):
         code, out, err = run(self.root, "fix", "run", blocker)
         self.assertEqual(code, 1)
         self.assertEqual(self.pr_calls(), [])
+
+
+class FixBranchTests(BlockerCase):
+    BRANCH = "crucible/fix-b-001"
+
+    def remote_branches(self):
+        return git(self.remote, "branch", "--list").split()
+
+    def test_fix_run_commits_on_branch(self):
+        self.allow(landing="local_branch")
+        blocker = self.planned()
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(git(self.repo, "branch", "--list", self.BRANCH).split()[-1], self.BRANCH)
+        self.assertEqual(git(self.repo, "show", f"{self.BRANCH}:lib.py"), "FIXED")
+        self.assertEqual(git(self.repo, "log", "-1", "--format=%ae", self.BRANCH), EMAIL)
+        self.assertEqual(git(self.repo, "status", "--porcelain", "--", "lib.py"), "")
+        self.assertEqual(self.remote_branches(), [])
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "fixed")
+        self.assertTrue(any(r["command"] == f"commit {blocker}" and r["status"] == "ok" for r in self.log()))
+
+    def test_push_needs_own_grant(self):
+        self.allow(push=False)
+        blocker = self.planned()
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.remote_branches(), [])
+        self.assertEqual(git(self.repo, "show", f"{self.BRANCH}:lib.py"), "FIXED")
+        self.assertEqual(self.gh_calls, [])
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "fixed-local")
+        self.assertIn("blocker_pushes", out + err)
+        self.assertTrue(any(r["group"] == "blocker_pushes" and r["status"] == "refused" for r in self.log()))
+        self.assertEqual(run(self.root, "grant", "blocker_pushes", "yes", "--words", "test words")[0], 0)
+        blocker = self.planned()
+        self.assertEqual(run(self.root, "fix", "run", blocker)[0], 0)
+        self.assertEqual(self.remote_branches(), ["crucible/fix-b-002"])
+        self.assertEqual(len(self.gh_calls), 1)
+
+    def test_pr_failure_keeps_blocker_fixed_local(self):
+        self.allow()
+        blocker = self.planned()
+        with mock.patch.object(github, "run_gh", side_effect=RuntimeError("gh is down")):
+            code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.remote_branches(), [self.BRANCH])
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "fixed-local")
+        self.assertIn("gh is down", out + err)
+        self.assertTrue(any(r["command"] == f"pr create {blocker}" and r["status"] == "failed" for r in self.log()))
 
 
 class FixPlanRefusalTests(BlockerCase):
