@@ -419,3 +419,26 @@ class PlanTests(PermissionCase):
         code, out, err = run(root, "plan")
         self.assertEqual(code, 0, err)
         self.assertIn("local_reads: not answered", out)
+
+
+class LsRemoteGrantTests(PermissionCase):
+    def test_ls_remote_refuses_without_grant(self):
+        from unittest import mock
+
+        from cruciblelib import clones
+        root = self.granted()
+        with mock.patch("subprocess.run") as spawned:
+            branch = clones.ls_remote_branch(Root(root), "https://example.invalid/a/b.git")
+        self.assertEqual(branch, "unknown")
+        spawned.assert_not_called()
+
+    def test_ls_remote_runs_behind_the_grant(self):
+        from unittest import mock
+
+        from cruciblelib import clones
+        root = self.granted({"workspace_clones": ["repos=a"]})
+        done = mock.Mock(stdout="ref: refs/heads/main\tHEAD\n")
+        with mock.patch("subprocess.run", return_value=done) as spawned:
+            branch = clones.ls_remote_branch(Root(root), "https://example.invalid/a/b.git")
+        self.assertEqual(branch, "main")
+        self.assertEqual(spawned.call_args[0][0][:3], ["git", "ls-remote", "--symref"])

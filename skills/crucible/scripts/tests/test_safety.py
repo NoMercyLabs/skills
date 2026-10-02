@@ -19,6 +19,8 @@ BLOB_MODULES = {"base64", "binascii", "marshal", "pickle", "zlib", "codecs"}
 NETWORK_ALLOWED = ("cruciblelib/trackers/", "cruciblelib/knowledge")
 SUBPROCESS_ALLOWED = ("cruciblelib/config.py", "cruciblelib/safety.py", "cruciblelib/trackers/github.py",
                       "cruciblelib/knowledge", "cruciblelib/clones.py")
+NETWORK_COMMANDS_ALLOWED = ("cruciblelib/clones.py", "cruciblelib/trackers/github.py")
+GIT_NETWORK_VERBS = {"clone", "fetch", "ls-remote", "pull", "push"}
 CREDENTIAL_PATHS = re.compile(
     r"\.ssh\b|\.aws\b|\.gnupg|\.azure\b|\.kube\b|\.netrc|\.git-credentials|\.pypirc|\.npmrc"
     r"|\.docker[/\\]config|\.config[/\\]gcloud|keychains?\b|login data|bash_history|zsh_history"
@@ -93,6 +95,11 @@ def scan_file(path, rel=None):
             out.append(("shell-true", node.lineno, name))
         if name.startswith("subprocess.") and (not node.args or not isinstance(node.args[0], (ast.List, ast.Tuple))):
             out.append(("subprocess-args", node.lineno, name))
+        if name.startswith("subprocess.") and node.args and isinstance(node.args[0], (ast.List, ast.Tuple)):
+            argv = [e.value if isinstance(e, ast.Constant) else None for e in node.args[0].elts[:2]]
+            network = argv[:1] == ["gh"] or (argv[:1] == ["git"] and len(argv) > 1 and argv[1] in GIT_NETWORK_VERBS)
+            if network and not allowed(rel, NETWORK_COMMANDS_ALLOWED):
+                out.append(("network-call", node.lineno, " ".join(str(a) for a in argv)))
     return sorted(out)
 
 
@@ -162,7 +169,20 @@ class PlantedViolations(unittest.TestCase):
     def test_git_clone_is_allowed_only_in_the_clones_adapter(self):
         call = "import subprocess\nsubprocess.run(['git', 'clone', 'a', 'b'])\n"
         self.assertEqual(self.scan(call, "cruciblelib/clones.py"), [])
-        self.assertEqual(self.rules(call, "cruciblelib/system.py"), {"subprocess-location"})
+        self.assertEqual(self.rules(call, "cruciblelib/system.py"), {"subprocess-location", "network-call"})
+
+    def test_git_network_and_gh_calls_are_refused_outside_the_two_adapters(self):
+        for argv in ("'git', 'clone', 'a'", "'git', 'fetch'", "'git', 'ls-remote', 'a'", "'git', 'pull'",
+                     "'git', 'push'", "'gh', 'api', 'x'"):
+            call = f"import subprocess\nsubprocess.run([{argv}])\n"
+            self.assertIn("network-call", self.rules(call, "cruciblelib/config.py"), argv)
+            self.assertIn("network-call", self.rules(call, "cruciblelib/knowledge.py"), argv)
+            self.assertNotIn("network-call", self.rules(call, "cruciblelib/clones.py"), argv)
+            self.assertNotIn("network-call", self.rules(call, "cruciblelib/trackers/github.py"), argv)
+
+    def test_local_git_calls_are_not_network_calls(self):
+        call = "import subprocess\nsubprocess.run(['git', '-C', 'p', 'remote', 'get-url', 'origin'])\n"
+        self.assertNotIn("network-call", self.rules(call, "cruciblelib/config.py"))
 
     def test_a_subprocess_call_needs_an_argument_list(self):
         self.assertEqual(self.rules("import subprocess\nsubprocess.run('ls -l')\n", "cruciblelib/config.py"),

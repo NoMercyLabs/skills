@@ -1,18 +1,23 @@
 """The only module that runs `git clone` and `git ls-remote` (an adapter, listed in SECURITY.md).
 
 A clone starts only inside `permissions.run_action` with the `workspace_clones` grant, so no grant
-means no folder and no process. `ls_remote_branch` is a read-only query of a remote's default branch.
+means no folder and no process. `ls_remote_branch` is a read-only query of a remote's default branch; it contacts the remote only with the same grant,
+and answers "unknown" without it.
 """
 import os
 import re
 import subprocess
 
 from .common import CrucibleError
-from .permissions import run_action
+from .permissions import authorize, run_action
 
 
-def ls_remote_branch(source):
-    """Default branch of a remote source, or "unknown"."""
+def ls_remote_branch(root, source):
+    """Default branch of a remote source, or "unknown" (also when the workspace_clones grant is missing: no grant, no network)."""
+    try:
+        authorize(root, "workspace_clones", f"ls-remote {source}")
+    except CrucibleError:
+        return "unknown"
     try:
         done = subprocess.run(["git", "ls-remote", "--symref", source, "HEAD"], capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):

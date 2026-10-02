@@ -372,10 +372,10 @@ def dir_size(path):
     return total
 
 
-def source_branch(source):
+def source_branch(root, source):
     if os.path.isdir(source):
         return git(source, "symbolic-ref", "--short", "HEAD") or "detached"
-    return clones.ls_remote_branch(source)
+    return clones.ls_remote_branch(root, source)
 
 
 def check_base(base, user_paths):
@@ -388,7 +388,7 @@ def check_base(base, user_paths):
     return base
 
 
-def clone_plan(cfg, base, sources):
+def clone_plan(root, cfg, base, sources):
     paths = [os.path.abspath(s) if os.path.isdir(s) else s for s in sources]
     known = {norm(r["path"]): r["name"] for r in cfg["repos"]}
     taken = {r["name"] for r in cfg["repos"]}
@@ -403,7 +403,7 @@ def clone_plan(cfg, base, sources):
                 name += "-2"
             taken.add(name)
         size = dir_size(source) if os.path.isdir(source) else None
-        rows.append({"name": name, "source": source, "branch": source_branch(source), "size_bytes": size,
+        rows.append({"name": name, "source": source, "branch": source_branch(root, source), "size_bytes": size,
                      "dest": os.path.join(base, name)})
     return rows
 
@@ -417,7 +417,7 @@ def cmd_ws_plan(args):
     cfg = root.config()
     sources = default_sources(cfg, args)
     base = check_base(args.base, [r["path"] for r in cfg["repos"]] + [s for s in sources if os.path.isdir(s)])
-    rows = clone_plan(cfg, base, sources)
+    rows = clone_plan(root, cfg, base, sources)
     print(f"base folder: {base} (fresh, outside your repos)")
     for row in rows:
         print(f"  {row['name']}: branch {row['branch']}, disk {human(row['size_bytes'])}, from {row['source']}")
@@ -518,7 +518,7 @@ def cmd_ws_clone(args):
     sources = default_sources(cfg, args)
     user_paths = [r["path"] for r in cfg["repos"]] + [s for s in sources if os.path.isdir(s)]
     check_base(base, user_paths)
-    rows = clone_plan(cfg, base, sources)
+    rows = clone_plan(root, cfg, base, sources)
     clones.clone_repos(root, rows, base, finish_clone)
     by_source = {norm(r["path"]): r for r in cfg["repos"] if os.path.isdir(r["path"])}
     for row in rows:
