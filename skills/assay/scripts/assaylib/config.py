@@ -2,6 +2,7 @@ import glob
 import os
 import re
 import secrets
+import shutil
 import subprocess
 
 from .common import AssayError, Root, split_lines, write_json
@@ -36,6 +37,7 @@ def default_config():
         "advisories": "draft",
         "owners": {},
         "privacy_words": [],
+        "memory": None,
         "budget": {"max_tokens": 0, "tokens_per_line": 34},
         "models": {"reader": "balanced", "verifier": "balanced", "check": "fast", "judge": "strong"},
         "live_checks": {"enabled": False, "targets": []},
@@ -82,6 +84,32 @@ def detect_repo(name, path):
     return entry
 
 
+def grimoira_status():
+    """'command', 'plugin' or '' : how the grimoira integration answers on this machine (best effort)."""
+    exe = shutil.which("grimoira")
+    if exe:
+        try:
+            done = subprocess.run([exe, "help"], capture_output=True, text=True, timeout=20)
+            if done.returncode == 0:
+                return "command"
+        except (OSError, subprocess.SubprocessError):
+            pass
+    home = os.path.expanduser("~")
+    for pattern in ("plugins/*grimoira*", "plugins/*/*grimoira*", "plugins/cache/*/*grimoira*"):
+        if glob.glob(os.path.join(home, ".claude", *pattern.split("/"))):
+            return "plugin"
+    return ""
+
+
+def render_memory():
+    found = grimoira_status()
+    if found == "command":
+        return "memory: the grimoira command answers"
+    if found == "plugin":
+        return "memory: a grimoira plugin folder exists (the command did not answer)"
+    return "memory: grimoira not found"
+
+
 def render(entry):
     d = entry["detected"]
     langs = ", ".join(f"{k} {v}" for k, v in d["languages"].items()) or "none"
@@ -125,12 +153,14 @@ def cmd_init(args):
     cfg["repos"] = [detect_repo(n, p) for n, p in zip(unique_names(paths), paths)]
     root.save_config(cfg)
     print("\n".join(render(e) for e in cfg["repos"]))
+    print(render_memory())
     print("config written, not confirmed: ask the user the interview questions, then run `assay confirm`")
 
 
 def cmd_detect(args):
     cfg = Root(args.root).config()
     print("\n".join(render(detect_repo(r["name"], r["path"])) for r in cfg["repos"]))
+    print(render_memory())
 
 
 def cmd_summary(args):
@@ -147,13 +177,37 @@ def cmd_summary(args):
     cap = cfg["budget"]["max_tokens"]
     lines.append(f"token cap: {cap or 'none'}")
     lines.append("models: " + ", ".join(f"{k} {v}" for k, v in cfg["models"].items()))
+    lines.append("permanent memory: " + describe_memory(cfg.get("memory")))
     lines.append(f"live checks: {'on' if cfg['live_checks']['enabled'] else 'off'}")
     print("\n".join(lines))
+
+
+def describe_memory(memory):
+    if not memory:
+        return "not chosen yet (ask the user: set up grimoira, use an installed store, or none)"
+    if memory.get("kind") == "grimoira":
+        return f"grimoira, instance {memory.get('instance') or 'default'}"
+    return "none (the next session re-learns the system; the next audit cannot skip files already read)"
+
+
+def cmd_memory(args):
+    root = Root(args.root)
+    cfg = root.config()
+    if args.kind == "grimoira":
+        cfg["memory"] = {"kind": "grimoira", "instance": args.instance or "default"}
+    else:
+        cfg["memory"] = {"kind": "none"}
+    root.save_config(cfg)
+    print("memory: " + describe_memory(cfg["memory"]))
 
 
 def cmd_confirm(args):
     root = Root(args.root)
     cfg = root.config()
+    if not cfg.get("memory"):
+        raise AssayError("memory not chosen: ask the user the permanent memory question "
+                         "(references/interview.md, item 11), then run `assay memory grimoira --instance NAME` "
+                         "or `assay memory none`")
     cfg["confirmed"] = True
     root.save_config(cfg)
     print("config confirmed")
@@ -167,5 +221,9 @@ def register(sub):
     p.set_defaults(func=cmd_detect)
     p = sub.add_parser("summary", help="print the config for the user to approve")
     p.set_defaults(func=cmd_summary)
+    p = sub.add_parser("memory", help="record the user's permanent memory choice")
+    p.add_argument("kind", choices=["grimoira", "none"])
+    p.add_argument("--instance", help="grimoira instance name")
+    p.set_defaults(func=cmd_memory)
     p = sub.add_parser("confirm", help="mark the config as approved by the user")
     p.set_defaults(func=cmd_confirm)
