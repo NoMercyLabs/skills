@@ -36,6 +36,7 @@ class ConfigTests(CrucibleCase):
 
     def test_confirm_flips_it(self):
         root, repo = self.make_root({"app.py": "x = 1\n"}, confirm=False)
+        self.answer_everything(root)
         code, out, err = run(root, "confirm")
         self.assertEqual(code, 0)
         self.assertTrue(self.read_config(root)["confirmed"])
@@ -51,6 +52,7 @@ class ConfigTests(CrucibleCase):
 
     def test_init_allowed_commands_work_unconfirmed(self):
         root, repo = self.make_root({"app.py": "x = 1\n"}, confirm=False)
+        self.answer_everything(root)
         for command in (["detect"], ["summary"], ["confirm"]):
             code, out, err = run(root, *command)
             self.assertEqual(code, 0, (command, err))

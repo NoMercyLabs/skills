@@ -24,6 +24,7 @@ class MemoryTests(CrucibleCase):
         self.assertFalse(read_json(os.path.join(root, "config.json"))["confirmed"])
         code, out, err = run(root, "memory", "none")
         self.assertEqual(code, 0, err)
+        self.answer_everything(root)
         code, out, err = run(root, "confirm")
         self.assertEqual(code, 0, err)
         self.assertTrue(read_json(os.path.join(root, "config.json"))["confirmed"])
@@ -38,6 +39,7 @@ class MemoryTests(CrucibleCase):
         code, out, err = run(root, "memory", "grimoira", "--instance", "work")
         self.assertEqual(code, 0, err)
         self.assertEqual(read_json(os.path.join(root, "config.json"))["memory"], {"kind": "grimoira", "instance": "work"})
+        self.answer_everything(root)
         self.assertEqual(run(root, "confirm")[0], 0)
 
     def test_summary_prints_the_memory_choice(self):
@@ -85,6 +87,7 @@ class DeltaTests(CrucibleCase):
         new_root = os.path.join(self.tmp(), "audit2")
         self.assertEqual(run(new_root, "init", "--repo", repo)[0], 0)
         self.assertEqual(run(new_root, "memory", "none")[0], 0)
+        self.answer_everything(new_root)
         self.assertEqual(run(new_root, "confirm")[0], 0)
         code, out, err = run(new_root, "inventory", "--delta", os.path.join(old_root, "coverage.json"), *extra)
         self.assertEqual(code, 0, out + err)

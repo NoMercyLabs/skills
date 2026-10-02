@@ -8,6 +8,7 @@ import unittest
 
 from cruciblelib import cli
 from cruciblelib.common import source_id
+from cruciblelib.permissions import GROUPS
 
 
 def run(root, *args):
@@ -43,8 +44,8 @@ class CrucibleCase(unittest.TestCase):
         code, out, err = run(root, "init", "--repo", repo)
         self.assertEqual(code, 0, err)
         config = dict(config or {})
-        if memory:
-            config.setdefault("memory", {"kind": "none"})
+        if memory and "memory" not in config:
+            self.assertEqual(run(root, "memory", "none")[0], 0)
         if config:
             path = os.path.join(root, "config.json")
             with open(path, encoding="utf-8") as fh:
@@ -53,9 +54,19 @@ class CrucibleCase(unittest.TestCase):
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(cfg, fh)
         if confirm:
+            self.answer_everything(root)
             code, out, err = run(root, "confirm")
             self.assertEqual(code, 0, err)
         return root, repo
+
+    def answer_everything(self, root):
+        """Answer the questions confirm needs, through the CLI, the way the interview does."""
+        for command in (["answer", "auto_file", "false"], ["answer", "blocker_fixes", '{"mode": "never"}']):
+            code, out, err = run(root, *command)
+            self.assertEqual(code, 0, err)
+        for group in GROUPS:
+            code, out, err = run(root, "grant", group, "no", "--words", "test default")
+            self.assertEqual(code, 0, err)
 
     def make_inventoried(self, files, config=None):
         root, repo = self.make_root(files, config=config)
@@ -90,6 +101,10 @@ class CrucibleCase(unittest.TestCase):
         with open(os.path.join(root, "ledger", unit + ".json"), "w", encoding="utf-8") as fh:
             json.dump({"unit": unit, "read": read, "skipped": skipped or {},
                        "leads": [] if leads is None else leads}, fh)
+
+    def read_text(self, path):
+        with open(path, encoding="utf-8") as fh:
+            return fh.read()
 
     def write(self, root, relative, data):
         path = os.path.join(root, *relative.split("/"))

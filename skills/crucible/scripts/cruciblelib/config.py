@@ -5,6 +5,7 @@ import secrets
 import shutil
 import subprocess
 
+from .answer import missing_for_confirm
 from .common import CrucibleError, Root, split_lines, write_json
 from .inventory import walk_text_files
 
@@ -38,6 +39,12 @@ def default_config():
         "owners": {},
         "privacy_words": [],
         "memory": None,
+        "auto_file": None,
+        "blocker_fixes": {"mode": None, "landing": "pr", "branch": None, "live_changes": "never"},
+        "backups": {"enabled": True, "path": None},
+        "knowledge_sources": [],
+        "permissions": {},
+        "answers": {},
         "budget": {"max_tokens": 0, "tokens_per_line": 34},
         "models": {"reader": "balanced", "verifier": "balanced", "check": "fast", "judge": "strong"},
         "live_checks": {"enabled": False, "targets": []},
@@ -179,6 +186,10 @@ def cmd_summary(args):
     lines.append("models: " + ", ".join(f"{k} {v}" for k, v in cfg["models"].items()))
     lines.append("permanent memory: " + describe_memory(cfg.get("memory")))
     lines.append(f"live checks: {'on' if cfg['live_checks']['enabled'] else 'off'}")
+    auto = cfg.get("auto_file")
+    lines.append("file findings automatically: " + ("not answered" if auto is None else "yes" if auto else "no"))
+    lines.append("backups: " + ("on" if cfg.get("backups", {}).get("enabled", True) else "off"))
+    lines.append("permissions: " + ", ".join(f"{g} {r['answer']}" for g, r in cfg.get("permissions", {}).items()))
     print("\n".join(lines))
 
 
@@ -208,6 +219,11 @@ def cmd_confirm(args):
         raise CrucibleError("memory not chosen: ask the user the permanent memory question "
                          "(references/interview.md, item 11), then run `crucible memory grimoira --instance NAME` "
                          "or `crucible memory none`")
+    missing = missing_for_confirm(cfg)
+    if missing:
+        raise CrucibleError("not every question is answered; missing: " + ", ".join(missing)
+                         + ". Ask the user, then record each with `crucible answer KEY VALUE --words ...` "
+                         "or `crucible grant GROUP yes|no --words ...` for permissions.GROUP (`crucible next` shows the next one)")
     cfg["confirmed"] = True
     root.save_config(cfg)
     print("config confirmed")
