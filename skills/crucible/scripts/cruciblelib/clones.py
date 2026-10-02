@@ -17,7 +17,7 @@ def ls_remote_branch(root, source):
     try:
         authorize(root, "workspace_clones", f"ls-remote {source}")
     except CrucibleError:
-        return "unknown"
+        return "unknown (not looked up: no workspace_clones permission)"
     try:
         done = subprocess.run(["git", "ls-remote", "--symref", source, "HEAD"], capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):

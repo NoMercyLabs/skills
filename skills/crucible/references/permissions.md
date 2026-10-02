@@ -34,6 +34,7 @@ If the user does not accept the first point, stop. Do not read a file.
 | `publish_report` | the final report anywhere outside the audit folder |
 | `blocker_fixes` | which blockers, how a fix lands, which systems may change live (see `blockers.md`) |
 | `transcripts` | the repos whose agent transcripts may be read, for shell commands and exit codes only |
+| `workspace_clones` | each repo to clone, its source, and the fresh base folder it goes into; also covers the read-only `git ls-remote` that finds a remote's default branch |
 | `knowledge_sources` | each named source, read-only, and where its text is written |
 
 Filing never puts a private finding in a public place: `crucible visibility list` shows what the user confirmed, and `file --apply` reads each repo's visibility again before every write.

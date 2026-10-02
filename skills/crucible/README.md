@@ -56,6 +56,10 @@ npx skills add NoMercyLabs/skills --skill crucible
 
 Or as a Claude Code plugin: `/plugin marketplace add NoMercyLabs/skills`, then `/plugin install nomercylabs@nomercylabs`.
 
+Grimoira, the optional permanent memory, installs with `/plugin marketplace add NoMercyLabs/skills` and then `/plugin install grimoira@nomercylabs`. If you already added NoMercyLabs/grimoira as a marketplace, keep it: it lists the same plugins.
+
+For a system that spans several repos, crucible detects the layout (`crucible layout`), lists the repos the code points to (`crucible related`), can read them from a fresh base folder (`crucible workspace`) and draws the edges between repos with file:line evidence (`crucible graph`).
+
 ## Design decisions
 
 **The engine enforces the interview.** A rule in a prompt is a promise. Every command refuses to run while the config is unconfirmed.

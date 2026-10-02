@@ -429,7 +429,7 @@ class LsRemoteGrantTests(PermissionCase):
         root = self.granted()
         with mock.patch("subprocess.run") as spawned:
             branch = clones.ls_remote_branch(Root(root), "https://example.invalid/a/b.git")
-        self.assertEqual(branch, "unknown")
+        self.assertEqual(branch, "unknown (not looked up: no workspace_clones permission)")
         spawned.assert_not_called()
 
     def test_ls_remote_runs_behind_the_grant(self):

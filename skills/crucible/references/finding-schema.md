@@ -20,7 +20,8 @@
 | `when` | object | `trigger`, `frequency` (`always`, `often`, `sometimes`, `once` or `unknown`) |
 | `why` | object | `cause`, `verified` (boolean) |
 | `how` | object | `reproduce` (list of steps), `fix`, `prove` |
-| `evidence` | list | `{kind: file_line or command, ref: "path:line", quote}` |
+| `evidence` | list | `{kind: file_line or command, ref: "path:line", quote, repo?}`; `repo` names the repo the line is in when it is not the finding's own repo |
+| `cross_repo` | list | optional; names of the other repos of the audit that the finding spans. Each name must be a repo of the config |
 | `siblings` | list | paths, or `searched: <query>, 0 more` |
 | `not_checked` | list | every claim not opened or run; `[]` when none |
 | `labels` | list | strings the tracker adapter maps |
@@ -32,6 +33,8 @@
 No field is empty. The text `not checked` is allowed. Placeholder text (`TBD`, `?`, `n/a`, `...`, `-`) is not.
 
 ## What the gate checks
+
+A finding that spans repos lists the other repos in `cross_repo` and carries evidence (a quote at a real line) from every side. The gate refuses it when a side has no evidence, when evidence cites a repo that `cross_repo` does not list, or when a name is not a repo of the audit.
 
 - `intent` is required. The gate checks that a brief line is a line the user said (`project-brief.md`), and that `intent_kind` fits its field.
 - `why.verified: true` needs at least one `file_line` evidence whose `quote` equals the real line in the snapshot.

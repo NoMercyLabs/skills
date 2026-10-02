@@ -130,6 +130,17 @@ Ask this first, before scope. The audit must never work against the user, so it 
 - **Ask**: "Backups are on by default and go to `ROOT/backups`. Keep that place, or choose another folder? Turning them off is your choice and is recorded."
 - If a backup is enabled and the copy fails, the change is not made.
 
+## 10e. Where the other repos live
+
+- **Why**: a system is often more than the repo in front of you. Reading one repo of several loses the depth between them, and the audit must say so.
+- **Detect first**: run `crucible layout` (single repo, monorepo, or a folder holding many repos) and `crucible related` (repos the code points to, each with file:line; `--same-owner` also lists the owner's other repos, read-only). Do not ask what a script can answer.
+- **Default**: this repo only, with the lost depth stated plainly (`crucible status` and `report` say it).
+- **Key**: `workspace` = `{"mode": "this_repo" | "existing_checkouts" | "base_folder", ...}`. Unset is `null`; `confirm` refuses while it is unset.
+- **Ask**: "These repos look related: LIST, each with the line that points to it. Read this repo only, add checkouts you already have (read-only), or clone them into a fresh base folder outside your repos? Your own checkouts are never touched, switched or written."
+- Show the clone plan first: `crucible workspace plan --base FOLDER` prints branch and disk size per repo. It writes nothing.
+- Record the choice with the user's own words: `crucible workspace choose this_repo|existing_checkouts|base_folder [--base FOLDER] [--repo PATH] --words "..."`. The base folder must be fresh (empty or new) and outside every user repo.
+- Cloning needs the `workspace_clones` grant: `crucible workspace clone`. Clones are read-only copies made without hard links.
+
 ## 11. Permanent memory
 
 - **Why**: without it, the next session re-learns the system and the next audit re-reads files it already read. `confirm` refuses until this is answered.
@@ -169,9 +180,11 @@ Three choices, offered in this order:
 1. **Set up Grimoira (recommended).** A public Claude Code plugin at github.com/NoMercyLabs/grimoira. It keeps a local SQLite store. Nothing leaves the machine. It needs the .NET 10 SDK. Show the user these two commands, each on its own line:
 
    ```
-   /plugin marketplace add NoMercyLabs/grimoira
+   /plugin marketplace add NoMercyLabs/skills
    /plugin install grimoira@nomercylabs
    ```
+
+   If you already added NoMercyLabs/grimoira as a marketplace, keep it: it lists the same plugins.
 
    The user runs them. Slash commands belong to the user; the agent cannot run them. After the user says they are done, the agent runs the full onboarding below. Record the instance name in `memory.instance`.
 2. **Use the Grimoira store already installed.** Ask which instance. Record it in `memory.instance`.

@@ -261,6 +261,14 @@ class WorkspaceTests(SystemCase):
         self.assertIn("grant workspace_clones", out)
         self.assertFalse(os.path.exists(base))
 
+    def test_workspace_plan_says_when_the_branch_was_not_looked_up_for_lack_of_a_grant(self):
+        repo = self.user_repo()
+        root = self.init_root(repo)
+        base = os.path.join(self.tmp(), "base")
+        code, out, err = run(root, "workspace", "plan", "--base", base, "--repo", "https://example.invalid/acme/far.git")
+        self.assertEqual(code, 0, err)
+        self.assertIn("far: branch unknown (not looked up: no workspace_clones permission)", out)
+
     def test_workspace_existing_checkouts_are_added_read_only(self):
         first = self.git_repo({"a.py": "1\n"}, name="orders")
         second = self.user_repo()
