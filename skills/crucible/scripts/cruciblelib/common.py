@@ -18,6 +18,9 @@ KEY_PATTERNS = [
     re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{2,}"),
     re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
 ]
+# Commands that start network access; the skill runs them only in its own adapters, never from a fix plan.
+GIT_NETWORK_VERBS = {"clone", "fetch", "ls-remote", "pull", "push"}
+NETWORK_PROGRAMS = {"gh", "curl", "wget", "ssh", "scp", "nc"}
 BASE64_RUN = re.compile(r"[A-Za-z0-9+/_-]{40,}={0,2}")
 
 

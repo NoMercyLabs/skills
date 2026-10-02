@@ -9,6 +9,8 @@ import re
 import tempfile
 import unittest
 
+from cruciblelib.common import GIT_NETWORK_VERBS
+
 SKILL = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCRIPTS = os.path.join(SKILL, "scripts")
 
@@ -21,7 +23,6 @@ SUBPROCESS_ALLOWED = ("cruciblelib/config.py", "cruciblelib/safety.py", "crucibl
                       "cruciblelib/knowledge", "cruciblelib/clones.py",
                       "cruciblelib/blockers.py")
 NETWORK_COMMANDS_ALLOWED = ("cruciblelib/clones.py", "cruciblelib/trackers/github.py")
-GIT_NETWORK_VERBS = {"clone", "fetch", "ls-remote", "pull", "push"}
 CREDENTIAL_PATHS = re.compile(
     r"\.ssh\b|\.aws\b|\.gnupg|\.azure\b|\.kube\b|\.netrc|\.git-credentials|\.pypirc|\.npmrc"
     r"|\.docker[/\\]config|\.config[/\\]gcloud|keychains?\b|login data|bash_history|zsh_history"

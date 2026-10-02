@@ -6,7 +6,7 @@ import subprocess
 
 from . import brief, rootcause
 from .backup import backup
-from .common import CrucibleError, Root, read_json, write_json
+from .common import GIT_NETWORK_VERBS, NETWORK_PROGRAMS, CrucibleError, Root, read_json, write_json
 from .permissions import authorize, log_action, now, refuse
 
 GROUP = "blocker_fixes"
@@ -65,6 +65,7 @@ def plan_problems(root, plan):
     key = rootcause.ref_key(plan.get("root_cause", ""))
     if key is None:
         problems.append("root_cause must be a file:line link to the cause of the blocker")
+    problems += network_problems(plan)
     problems += brief.fix_plan_problems(root, plan)
     if key is None:
         return problems
@@ -98,6 +99,21 @@ def split_command(text, label):
     return argv
 
 
+def network_command(argv):
+    """The command as text when argv starts network access, else None."""
+    program = os.path.basename(argv[0].replace("\\", "/")).lower()
+    program = program[:-4] if program.endswith(".exe") else program
+    if program in NETWORK_PROGRAMS or (program == "git" and GIT_NETWORK_VERBS.intersection(argv[1:])):
+        return " ".join(argv)
+    return None
+
+
+def network_problems(plan):
+    return [f"refused: the fix command {text!r} starts network access: a blocker fix lands locally, so you run it "
+            "yourself; the landing flow you chose does the push or the pull request"
+            for text in (network_command(plan.get(key) or [""]) for key in ("change", "proof")) if text]
+
+
 def repo_dir(root):
     repos = root.config().get("repos") or []
     if not repos:
@@ -115,6 +131,15 @@ def cmd_blocker_list(args):
     for row in rows:
         print(f"{row['id']} {row['status']} {row['stage'] or '-'}: {row['description']}")
     print(f"blockers: {len(rows)}, open {sum(1 for r in rows if r['status'] == 'open')}")
+
+
+def report_lines(root):
+    rows = load(root)
+    if not rows:
+        return ["blockers: 0"]
+    by_status = ", ".join(f"{s} {n}" for s in STATUSES if (n := sum(1 for r in rows if r["status"] == s)))
+    return [f"blockers: {len(rows)} ({by_status})"] + [
+        f"  {r['id']} {r['stage'] or '-'}: {r['description']}" for r in rows if r["status"] != "fixed"]
 
 
 def cmd_fix_plan(args):

@@ -299,6 +299,8 @@ def cmd_report(args):
     if by_visibility:
         print("filed by visibility: " + ", ".join(f"{k} {v}" for k, v in sorted(by_visibility.items())))
         print("filed by destination: " + ", ".join(f"{k} {v}" for k, v in sorted(by_destination.items())))
+    from .blockers import report_lines
+    print("\n".join(report_lines(root)))
     from .brief import routing_lines
     print("\n".join(routing_lines(root)))
     absorbed, missed = knowledge_lines(state)
