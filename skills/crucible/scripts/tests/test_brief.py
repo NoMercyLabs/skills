@@ -286,3 +286,5 @@ class BriefShapeTests(CrucibleCase):
         verifier = self.read_text(os.path.join(base, "agents", "verifier.md"))
         self.assertIn("verified_links", verifier)
         self.assertIn('"visibility": "private"', verifier)
+        self.assertIn("When unsure, private", verifier)
+        self.assertIn("a live or production setting", verifier)
