@@ -1,0 +1,30 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "allowed_origins": ["https://tasks.example.com"]
+  },
+  "database": {
+    "path": "data/tasks.sqlite3"
+  },
+  "uploads": {
+    "directory": "data/uploads",
+    "max_bytes": 5242880
+  },
+  "auth": {
+    "token_secret": "change-me-in-the-environment",
+    "token_ttl_minutes": 60,
+    "password_iterations": 120000,
+    "admin_email": "admin@example.com"
+  },
+  "pagination": {
+    "default": 25,
+    "max": 100
+  },
+  "worker": {
+    "poll_seconds": 2,
+    "lease_seconds": 60,
+    "webhook_timeout_seconds": 5,
+    "webhook_max_attempts": 5
+  }
+}
