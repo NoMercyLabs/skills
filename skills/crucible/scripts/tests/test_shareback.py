@@ -6,7 +6,7 @@ from cruciblelib import shareback
 from cruciblelib.common import CrucibleError, Root
 from cruciblelib.permissions import read_log
 
-from .helpers import CrucibleCase
+from .helpers import CrucibleCase, run
 
 PLANTED = ("C:/Users/jane/code/payments-api/src/billing.py", "payments-api", "Jane Doe",
            "https://git.example.org/acme/payments-api/issues/7", "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8")
@@ -71,6 +71,29 @@ class ShareBackTests(CrucibleCase):
         self.assertIn("nothing was sent", read_log(self.root)[-1]["result"])
         with open(os.path.join(self.root.path, "config.json"), encoding="utf-8") as fh:
             self.assertEqual(json.load(fh)["share_back"]["answers"]["L-1a2b3c4d"]["answer"], "no")
+
+
+class ReportOfferTests(CrucibleCase):
+    def report(self, enabled, change):
+        config = {"share_back": {"enabled": True, "answers": {}}} if enabled else None
+        root = self.make_root({"a.py": "x = 1\n"}, config=config)[0]
+        folder = os.path.join(root, "lessons")
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, "L-1a2b3c4d.json"), "w", encoding="utf-8") as fh:
+            json.dump({"id": "L-1a2b3c4d", "target": "audit", "kind": "unit_size", "signature": "x", "state": "active",
+                       "evidence": {"count": 3, "records": ["actions.log#0"]}, "change": change,
+                       "expected": {"metric": "failures per run", "before": 3, "after": 0},
+                       "check": "run learn review"}, fh)
+        code, out, err = run(root, "report")
+        self.assertEqual(code, 0, err)
+        return out
+
+    def test_report_offers_shareback_when_enabled(self):
+        out = self.report(True, {"unit_size_factor": 0.75})
+        self.assertIn("shareback offer L-1a2b3c4d", out)
+        self.assertIn("nothing is sent without your yes", out)
+        self.assertNotIn("shareback offer", self.report(False, {"unit_size_factor": 0.75}))
+        self.assertNotIn("shareback offer", self.report(True, {"reader_addendum": "skip src/billing.py"}))
 
 
 if __name__ == "__main__":
