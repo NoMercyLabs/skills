@@ -1,7 +1,9 @@
 import json
 import os
 import unittest
+from unittest import mock
 
+from cruciblelib import selftest
 from cruciblelib.common import Root
 
 from .helpers import CrucibleCase, run
@@ -72,6 +74,41 @@ class SelftestTests(CrucibleCase):
         self.assertIn("invented 0", out)
         self.assertIn("coverage 100%", out)
         self.assertIn("proof PASS", out)
+
+    def temp_expected(self):
+        """A temp EXPECTED file with one seeded defect and one known extra; the real file is never touched."""
+        path = os.path.join(self.tmp(), "EXPECTED.json")
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump({"defects": [{"id": "D03", "file": "app/routes.py", "line_start": 233, "line_end": 233,
+                                    "goal": "security", "summary": "seeded"}],
+                       "known_extras": [{"file": "app/db.py", "line_start": 100, "line_end": 110,
+                                         "title": "a real defect that is not seeded"}]}, fh)
+        return path
+
+    def score_with_temp_expected(self, work):
+        with mock.patch.object(selftest, "EXPECTED", self.temp_expected()):
+            return run(work, "selftest", "--score")
+
+    def test_known_extra_not_counted_invented(self):
+        work, _ = self.prepared()
+        self.file_finding(work, 1, "app/routes.py", 233)
+        self.file_finding(work, 2, "app/db.py", 105)
+        code, out, err = self.score_with_temp_expected(work)
+        self.assertIn("found 1 of 1", out)
+        self.assertIn("extra (known) 1 (F-0002)", out)
+        self.assertIn("invented 0", out)
+        self.assertNotIn("invented findings accepted", out)
+
+    def test_unlisted_finding_still_invented(self):
+        work, _ = self.prepared()
+        self.file_finding(work, 1, "app/routes.py", 233)
+        self.file_finding(work, 2, "app/db.py", 105)
+        self.file_finding(work, 3, "web/main.js", 1)
+        code, out, err = self.score_with_temp_expected(work)
+        self.assertEqual(code, 1, out + err)
+        self.assertIn("extra (known) 1 (F-0002)", out)
+        self.assertIn("invented 1 (F-0003)", out)
+        self.assertIn("1 invented findings accepted", out)
 
     def test_prepare_hides_expected_defects(self):
         work, out = self.prepared()
