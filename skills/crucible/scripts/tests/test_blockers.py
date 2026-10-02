@@ -13,9 +13,10 @@ PY = sys.executable.replace("\\", "/")
 FILES = {"app.py": "def start():\n    return load()\n", "lib.py": "def load():\n    return 'broken'\n"}
 CHANGE = f'{PY} -c "open(\'lib.py\', \'w\').write(\'FIXED\')"'
 PROOF = f'{PY} -c "import sys; sys.exit(0 if open(\'lib.py\').read() == \'FIXED\' else 1)"'
+CHANGE_APP = f'{PY} -c "open(\'app.py\', \'w\').write(\'FIXED2\')"'
+PROOF_APP = f'{PY} -c "import sys; sys.exit(0 if open(\'app.py\').read() == \'FIXED2\' else 1)"'
 
-
-EMAIL = "dev@example.test"
+EMAIL ="dev@example.test"
 
 
 def git(repo, *args):
@@ -235,6 +236,21 @@ class FixBranchTests(BlockerCase):
         self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "fixed-local")
         self.assertIn("gh is down", out + err)
         self.assertTrue(any(r["command"] == f"pr create {blocker}" and r["status"] == "failed" for r in self.log()))
+
+    def test_each_fix_pr_contains_only_its_fix(self):
+        self.allow(landing="local_branch")
+        first = self.planned()
+        second = self.planned(root_cause="app.py:1", touch="app.py", test="test_start=app.py:1", change=CHANGE_APP,
+                              proof=PROOF_APP)
+        for blocker in (first, second):
+            self.assertEqual(run(self.root, "fix", "run", blocker)[0], 0)
+        self.assertEqual(git(self.repo, "diff", "--name-only", f"{self.base}..crucible/fix-b-001").split(), ["lib.py"])
+        self.assertEqual(git(self.repo, "diff", "--name-only", f"{self.base}..crucible/fix-b-002").split(), ["app.py"])
+        self.assertEqual(git(self.repo, "rev-parse", "--abbrev-ref", "HEAD"), "crucible/audit-fixes")
+        self.assertEqual(git(self.repo, "show", "crucible/audit-fixes:lib.py"), "FIXED")
+        self.assertEqual(git(self.repo, "show", "crucible/audit-fixes:app.py"), "FIXED2")
+        self.assertEqual(self.remote_branches(), [])
+        self.assertTrue(any(r["command"] == f"merge {second}" and r["status"] == "ok" for r in self.log()))
 
 
 class FixPlanRefusalTests(BlockerCase):
