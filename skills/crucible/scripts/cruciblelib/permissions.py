@@ -10,7 +10,7 @@ from .status import coverage_counts, coverage_line, repo_coverage_lines, tokens_
 GROUPS = ("local_reads", "agent_runs", "installs", "memory_writes", "tracker_board", "tracker_labels",
           "tracker_issues", "tracker_advisories", "tracker_assignees", "tracker_comments", "live_checks",
           "publish_report", "blocker_fixes", "transcripts", "workspace_clones", "history", "knowledge_sources",
-          "knowledge_clone")
+          "knowledge_clone", "user_instructions")
 
 # What each group lets the run do, what it costs and where the data goes: the plan prints these verbatim.
 GROUP_INFO = {
@@ -22,7 +22,7 @@ GROUP_INFO = {
                  "downloads to this machine"),
     "memory_writes": ("write facts, rules and findings to permanent memory", "none",
                       "stays on this machine"),
-    "tracker_board": ("create or map the board and its fields", "none", "the tracker"),
+    "tracker_board": ("create or map the board, its fields and its views", "none", "the tracker"),
     "tracker_labels": ("create the named labels", "none", "the tracker"),
     "tracker_issues": ("create issues, up to max_count, in the listed repos", "none",
                        "the tracker; issues on a public repo are public"),
@@ -47,6 +47,8 @@ GROUP_INFO = {
                           "read-only requests to the named sources"),
     "knowledge_clone": ("clone the named git knowledge sources into a scratch folder and read their text", "disk "
                         "for the clone until it is read", "the clone stays on this machine and is removed after the read"),
+    "user_instructions": ("read the size and the headings of the user-wide agent instruction file named in the bounds",
+                          "none", "stays on this machine; the text is never printed or sent anywhere"),
 }
 
 LIST_BOUNDS = ("repos", "labels", "assignees", "kinds", "sources", "targets", "commands")

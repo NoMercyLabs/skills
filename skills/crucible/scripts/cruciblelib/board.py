@@ -5,6 +5,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import re
 from collections import Counter
 
 from . import blockers, rootcause
@@ -206,12 +207,14 @@ def map_fields(cfg, wanted):
 
 
 def build_views(result, private_board):
-    views = [{"name": "Start here", "group_by": "Stage", "filter": f"Stage = {result['stages'][0]['name']}"},
-             {"name": "By stage", "group_by": "Stage", "filter": ""},
-             {"name": "By repo", "group_by": "Area", "filter": ""},
-             {"name": "By owner", "group_by": "Owner", "filter": ""}]
+    views = [{"name": "Start here", "group_by": "Stage", "filter": f"Stage = {result['stages'][0]['name']}",
+              "layout": "BOARD_LAYOUT"},
+             {"name": "By stage", "group_by": "Stage", "filter": "", "layout": "BOARD_LAYOUT"},
+             {"name": "By repo", "group_by": "Area", "filter": "", "layout": "TABLE_LAYOUT"},
+             {"name": "By owner", "group_by": "Owner", "filter": "", "layout": "TABLE_LAYOUT"}]
     if private_board:
-        views.append({"name": "Security", "group_by": "Severity", "filter": "finding visibility = private"})
+        views.append({"name": "Security", "group_by": "Severity", "filter": "finding visibility = private",
+                      "layout": "TABLE_LAYOUT"})
     return views
 
 
@@ -341,10 +344,64 @@ def cmd_apply(args):
             if field["add_values"]:
                 print(f"options not added to {field['name']}: gh has no command to add options to an existing "
                       f"field; add by hand: {', '.join(map(str, field['add_values']))}")
+    apply_views(root, plan, adapter, owner, number, repos)
+
+
+def view_filter(view, plan_fields):
+    """The board filter text for a plan view `Field = Value`; "" when the filter names no board field."""
+    match = re.match(r"^(.+?) = (.+)$", view["filter"] or "")
+    if not match or match.group(1) not in [f["name"] for f in plan_fields]:
+        return ""
+    return f'{match.group(1).lower().replace(" ", "-")}:"{match.group(2)}"'
+
+
+def apply_views(root, plan, adapter, owner, number, repos):
+    """Create the plan's views and set their filters (the API sets neither group by nor sort: those are listed)."""
+    project = adapter.project_id(owner, number)
+    live = adapter.list_fields(owner, number)
+    field_ids = [f["id"] for f in live if f["name"] in ["Title"] + [p["name"] for p in plan["fields"]]]
+    existing = {v["name"]: v for v in adapter.list_views(project)}
+    expected = {}
     for view in plan["views"]:
-        print(f"view not created: gh has no command: {view['name']} (group by {view['group_by']}"
-              + (f", where {view['filter']}" if view["filter"] else "") + "); create it on the board page")
-        log_action(root, "tracker_board", f"view {view['name']}", "gh has no command to create a view", "skipped")
+        name, want = view["name"], view_filter(view, plan["fields"])
+        found = existing.get(name)
+        if found:
+            print(f"view kept: {name}")
+        else:
+            found = run_action(root, "tracker_board", f"create view {name} on board:{owner}/{number}",
+                               lambda v=view: adapter.create_view(project, v["name"], v["layout"], field_ids),
+                               repos=repos)
+            print(f"view created: {name} ({view['layout']})")
+        if want and found.get("filter") != want:
+            run_action(root, "tracker_board", f"update filter of view {name}",
+                       lambda i=found["id"], f=want: adapter.set_view_filter(i, f), repos=repos)
+            print(f"view filter set: {name} ({want})")
+        elif view["filter"] and not want:
+            print(f"view filter not set: {name}: {view['filter']!r} names no board field; set it on the board page")
+        expected[name] = {"layout": view["layout"], "filter": want}
+        print(f"view {name}: group by {view['group_by']} cannot be set through the API; set it on the board page")
+    write_json(root.p("board", "views.json"), expected)
+
+
+def view_problems(root, cfg, adapter):
+    """Compare the views `board apply` made with what the board holds now."""
+    expected = read_json(root.p("board", "views.json"))
+    if not expected or not vis.board_key(cfg):
+        return []
+    owner, number = board_ref(cfg)
+    try:
+        live = {v["name"]: v for v in adapter.list_views(adapter.project_id(owner, number))}
+    except CrucibleError as exc:
+        return [f"cannot read the board views back: {exc}"]
+    problems = []
+    for name, want in sorted(expected.items()):
+        if name not in live:
+            problems.append(f"view {name} is not on the board")
+            continue
+        for key in ("layout", "filter"):
+            if want[key] and (live[name].get(key) or "") != want[key]:
+                problems.append(f"view {name}: {key} is {live[name].get(key)!r}, it was set to {want[key]!r}")
+    return problems
 
 
 def set_item_fields(root, cfg, adapter, fid, ref, repos, state):

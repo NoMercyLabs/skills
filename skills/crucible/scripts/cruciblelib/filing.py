@@ -280,6 +280,7 @@ def cmd_verify(root):
     on_board = [(key, row) for key, row in sorted(filed.items()) if row.get("board_fields")]
     if on_board:
         problems += board.read_back_problems(get("issue"), on_board)
+        problems += board.view_problems(root, cfg, get("issue"))
     for key, kind, text in public_texts:
         lowered = text.lower()
         for fid, f in sorted(private_findings.items()):

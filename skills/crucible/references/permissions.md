@@ -24,7 +24,7 @@ If the user does not accept the first point, stop. Do not read a file.
 | `agent_runs` | number of readers and verifiers, model tier per role, estimated tokens, the hard cap |
 | `installs` | the memory plugin (the user runs its commands); anything else the setup needs, named |
 | `memory_writes` | which Grimoira instance, which kinds of record |
-| `tracker_board` | create or map the board and its fields |
+| `tracker_board` | create or map the board, its fields and its views |
 | `tracker_labels` | create labels (named) |
 | `tracker_issues` | create issues (maximum count, which repos) |
 | `tracker_advisories` | draft advisories (which repos) |
@@ -38,6 +38,7 @@ If the user does not accept the first point, stop. Do not read a file.
 | `workspace_clones` | each repo to clone, its source, and the fresh base folder it goes into; also covers the read-only `git ls-remote` that finds a remote's default branch |
 | `knowledge_sources` | each named source, read-only, and where its text is written |
 | `knowledge_clone` | each `git:URL` knowledge source to clone into a scratch folder, read, and remove; asked together with `knowledge_sources`; no grant, no clone |
+| `user_instructions` | the one user-wide agent instruction file (outside the project) that `costs` may measure, as a `targets` bound; its size and headings only |
 
 Filing never puts a private finding in a public place: `crucible visibility list` shows what the user confirmed, and `file --apply` reads each repo's visibility again before every write.
 
@@ -56,7 +57,7 @@ python scripts/crucible.py --root ROOT next
 - `grant GROUP yes|no` records `{answer, words, bounds, at}` in `config.permissions[GROUP]`. `--words` is the user's own text; never write it for them. `--bound key=value` is repeatable. Bound keys: `repos`, `max_count`, `labels`, `assignees`, `instance`, `kinds`, `sources`, `targets`, `commands`, `mode`.
 - A `no` is final. A later `grant GROUP yes` is refused unless `--reopen` is given together with the user's own `--words`. Do not ask again in another form, and do not look for another action that reaches the same result.
 - `approve PLAN_HASH` records the user's go for exactly that plan. A changed plan has a new hash and needs a new approval.
-- `board propose` writes `board/plan.json`, prints every field, value, stage, view and roadmap mapping with its source, and prints a plan hash. That hash is approved with `approve` like a dry run. When the tracker is a board, `file --apply` refuses until the current board plan has an approved hash, even when `auto_file` is on. `board apply` creates the plan's missing fields under the `tracker_board` grant, backs up the board's fields, options and items to `ROOT/backups` first (the path goes to actions.log), keeps every field the board already has, and lists the views for the user to create because gh has no view command. `file --apply` then sets each item's fields under the same grant, and `file --verify` reads them back.
+- `board propose` writes `board/plan.json`, prints every field, value, stage, view and roadmap mapping with its source, and prints a plan hash. That hash is approved with `approve` like a dry run. When the tracker is a board, `file --apply` refuses until the current board plan has an approved hash, even when `auto_file` is on. `board apply` creates the plan's missing fields under the `tracker_board` grant, backs up the board's fields, options and items to `ROOT/backups` first (the path goes to actions.log), keeps every field the board already has, creates the plan's views and sets their filters through `gh api graphql` (`createProjectV2View`, `updateProjectV2View`), and lists each view's group by for the user to set on the board page because the API cannot set it. `file --verify` reads the views back. `file --apply` then sets each item's fields under the same grant, and `file --verify` reads them back.
 - `answer` and `next` are the interview commands (see `interview.md`).
 - `confirm` refuses until every group has an answer, and also until the memory, filing and blocker-fix choices are answered. Its message lists what is missing.
 

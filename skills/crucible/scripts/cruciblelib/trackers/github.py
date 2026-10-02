@@ -9,6 +9,14 @@ from .base import Tracker
 NEEDED_SCOPES = {"issue": ("repo",), "advisory": ("repo", "security_events"), "board": ("project",)}
 
 
+VIEW_FIELDS = "id name layout filter"
+VIEWS_QUERY = ("query($id:ID!){node(id:$id){... on ProjectV2{views(first:50){nodes{" + VIEW_FIELDS + "}}}}}")
+CREATE_VIEW = ("mutation($input:CreateProjectV2ViewInput!){createProjectV2View(input:$input){projectV2View{"
+               + VIEW_FIELDS + "}}}")
+UPDATE_VIEW = ("mutation($input:UpdateProjectV2ViewInput!){updateProjectV2View(input:$input){projectV2View{"
+               + VIEW_FIELDS + "}}}")
+
+
 def run_gh(args, stdin=None):
     """Run `gh` with an argument list and return stdout; a failure raises with gh's own message."""
     try:
@@ -105,6 +113,25 @@ class GitHub(Tracker):
         if option is None:
             raise CrucibleError(f"the board field {field['name']} has no option {value!r}")
         run_gh(args + ["--single-select-option-id", option["id"]])
+
+    def graphql(self, query, variables):
+        """One GraphQL call; the body goes on stdin so nested input objects need no flag quoting."""
+        out = json.loads(run_gh(["api", "graphql", "--input", "-"], stdin=json.dumps({"query": query, "variables": variables})))
+        if out.get("errors"):
+            raise CrucibleError("gh api graphql failed: " + "; ".join(str(e.get("message", e)) for e in out["errors"]))
+        return out["data"]
+
+    def list_views(self, project_id):
+        data = self.graphql(VIEWS_QUERY, {"id": project_id})
+        return data["node"]["views"]["nodes"]
+
+    def create_view(self, project_id, name, layout, field_ids):
+        data = self.graphql(CREATE_VIEW, {"input": {"projectId": project_id, "name": name, "layout": layout,
+                                                    "configuration": {"visibleFieldIds": field_ids}}})
+        return data["createProjectV2View"]["projectV2View"]
+
+    def set_view_filter(self, view_id, filter_text):
+        self.graphql(UPDATE_VIEW, {"input": {"viewId": view_id, "filter": filter_text}})
 
     def read(self, kind, target, ref):
         if kind == "advisory":
