@@ -1,6 +1,7 @@
 import json
 import re
 
+from . import heal
 from .common import CrucibleError, Root, stamp
 
 HEADER = re.compile(r"^=== (.+?) ([0-9a-f]{10}) (\d+)-(\d+)/(\d+) ===$", re.M)
@@ -91,6 +92,8 @@ def cmd_proof(args):
     state["units"].setdefault(args.unit, {"status": "pending"})["proof"] = "pass" if ok else "fail"
     root.save_state(state)
     print(message)
+    if not ok:
+        heal.record_failure(root, args.unit, message, "gate" if message.startswith("TAMPER REFUSED") else None)
     return 0 if ok else 1
 
 

@@ -162,3 +162,35 @@ class ProofTests(CrucibleCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProofFailureHealTests(CrucibleCase):
+    def test_unit_failure_goes_through_heal(self):
+        root = self.make_inventoried(FILES)
+        unit = "svc-u01"
+        self.write_ledger(root, unit, ["api/handler.py"])
+        tr = self.transcript(root, unit, ["api/handler.py", "deploy.sh"])
+        code, out, err = run(root, "proof", unit, tr)
+        self.assertEqual(code, 1)
+        self.assertIn("PROOF FAIL", out)
+        with open(os.path.join(root, "heals.json"), encoding="utf-8") as fh:
+            rows = json.load(fh)
+        self.assertEqual([(r["unit"], r["class"], r["result"]) for r in rows], [(unit, "unknown", "reported")])
+
+    def test_tamper_refusal_is_recorded_refused_not_retried(self):
+        root = self.make_inventoried(FILES)
+        unit = "svc-u01"
+        self.write_ledger(root, unit, ["api/handler.py", "deploy.sh"])
+        tr = self.transcript(root, unit, ["api/handler.py", "deploy.sh"], drop_line=7)
+        self.assertEqual(run(root, "proof", unit, tr)[0], 1)
+        with open(os.path.join(root, "heals.json"), encoding="utf-8") as fh:
+            rows = json.load(fh)
+        self.assertEqual([(r["class"], r["result"]) for r in rows], [("refused", "refused")])
+
+    def test_passing_proof_writes_no_heal_record(self):
+        root = self.make_inventoried(FILES)
+        unit = "svc-u01"
+        self.write_ledger(root, unit, ["api/handler.py", "deploy.sh"])
+        tr = self.transcript(root, unit, ["api/handler.py", "deploy.sh"])
+        self.assertEqual(run(root, "proof", unit, tr)[0], 0)
+        self.assertFalse(os.path.exists(os.path.join(root, "heals.json")))

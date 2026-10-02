@@ -111,6 +111,19 @@ def recover(root, unit, facts, runner):
     return record(root, cls, unit, used + 1, "failed", detail)
 
 
+def no_rerun(unit, **options):
+    return {"ok": False}
+
+
+def record_failure(root, unit, output, refusal=None):
+    """Heal record for a stage the command line itself found failed. The command line cannot rerun a reader, so no
+    recovery that needs a rerun is attempted here; the facts are classified and recorded."""
+    facts = {"exit_code": 1, "output": output, "schema_ok": False, "truncated": False, "tool_calls": 1}
+    if refusal:
+        facts["refusal"] = refusal
+    return recover(root, unit, facts, no_rerun)
+
+
 def report_lines(root):
     rows = load(root)
     if not rows:
