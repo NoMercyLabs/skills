@@ -148,6 +148,8 @@ class FixLandingTests(BlockerCase):
         self.assertEqual(self.landing(), "pr")
 
     def test_fix_plan_answered_landing_is_kept(self):
+        code, out, err = run(self.root, "answer", "blocker_fixes.branch", "crucible/shared", "--words", "test words")
+        self.assertEqual(code, 0, err)
         for choice in ("local_branch", "push_branch"):
             with self.subTest(landing=choice):
                 code, out, err = run(self.root, "answer", "blocker_fixes.landing", choice, "--words", "test words")

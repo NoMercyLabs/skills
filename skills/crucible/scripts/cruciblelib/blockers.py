@@ -2,6 +2,7 @@
 with the user's grant, a backup first, and a proof that the blocked stage now runs."""
 import os
 import shlex
+import shutil
 import subprocess
 
 from . import brief, clones, rootcause
@@ -69,6 +70,11 @@ def plan_problems(root, plan):
     if key is None:
         problems.append("root_cause must be a file:line link to the cause of the blocker")
     problems += network_problems(plan)
+    if plan.get("landing") == "push_branch":
+        branch = (plan.get("branch") or "").strip()
+        if not branch or branch.startswith("-"):
+            problems.append("the landing is push_branch but blocker_fixes.branch names no usable branch: answer "
+                            "blocker_fixes.branch, or choose another landing")
     problems += brief.fix_plan_problems(root, plan)
     if key is None:
         return problems
@@ -224,6 +230,18 @@ def start_fix_branch(root, row, repo, branch):
                       lambda: git_step(repo, "checkout", "-b", branch, fix_base(root, repo)))
 
 
+def leave_failed_fix(root, repo, branch, copies):
+    """A failed change or proof strands nothing: put the touched files back from their backups, return to the
+    integration branch (or the base), and drop the fix branch, which holds no commit, so a rerun starts clean."""
+    for source, copy in copies:
+        if copy and os.path.isfile(copy):
+            shutil.copy2(copy, source)
+    target = INTEGRATION if run_command(["git", "-C", repo, "rev-parse", "--verify", "-q",
+                                         f"refs/heads/{INTEGRATION}"], repo)[0] == 0 else fix_base(root, repo)
+    git_step(repo, "checkout", "-q", "-f", target)
+    git_step(repo, "branch", "-D", branch)
+
+
 def commit_fix(root, row, plan, repo, branch):
     """Commit the touched files on the fix branch, as the user's own git config says."""
     files = [touch_path(t) for t in plan["touches"] if os.path.isfile(os.path.join(repo, *touch_path(t).split("/")))]
@@ -315,17 +333,24 @@ def cmd_fix_run(args):
     if problems:
         refuse(root, GROUP, command, "; ".join(problems))
     repo = repo_dir(root)
+    copies = []
     for source in plan["backup"]:
-        backup(root, f"{args.blocker_id}-{touch_path(source).replace('/', '-')}",
-               os.path.join(repo, *touch_path(source).split("/")))
+        path = os.path.join(repo, *touch_path(source).split("/"))
+        copies.append((path, backup(root, f"{args.blocker_id}-{touch_path(source).replace('/', '-')}", path)))
+    branch = fix_branch(row, plan)
     try:
-        start_fix_branch(root, row, repo, fix_branch(row, plan))
+        start_fix_branch(root, row, repo, branch)
     except CrucibleError as exc:
         set_status(root, args.blocker_id, "failed")
         raise CrucibleError(f"{args.blocker_id} could not start its fix branch: {exc}")
     code, text = run_command(plan["change"], repo)
     if code == 0:
         code, text = run_command(plan["proof"], repo)
+    if code != 0:
+        try:
+            leave_failed_fix(root, repo, branch, copies)
+        except CrucibleError as exc:
+            text += f"; the checkout was not cleaned: {exc}"
     reason = land(root, row, plan, repo) if code == 0 else ""
     status = "failed" if code != 0 else "fixed-local" if reason else "fixed"
     set_status(root, args.blocker_id, status)
