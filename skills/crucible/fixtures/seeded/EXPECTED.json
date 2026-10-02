@@ -127,6 +127,24 @@
    "line_start": 50,
    "line_end": 50,
    "title": "Webhook delivery posts to any host with no check of the target address"
+  },
+  {
+   "file": "app/routes.py",
+   "line_start": 142,
+   "line_end": 143,
+   "title": "A non-scalar assignee_id in task creation gets a 500 instead of a 422"
+  },
+  {
+   "file": "app/server.py",
+   "line_start": 122,
+   "line_end": 128,
+   "title": "Browser preflight requests get 501 because the server has no OPTIONS handler"
+  },
+  {
+   "file": "web/tasks.js",
+   "line_start": 94,
+   "line_end": 95,
+   "title": "Search responses can arrive out of order and overwrite the newest results"
   }
  ]
 }
