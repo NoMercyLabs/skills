@@ -2,7 +2,7 @@ import glob
 import os
 import re
 
-from .common import CrucibleError, Root, read_json
+from .common import CrucibleError, Root, has_key_like, read_json
 
 SEVERITIES = ("critical", "high", "medium", "low")
 SIZES = ("S", "M", "L")
@@ -12,28 +12,6 @@ EVIDENCE_KINDS = ("file_line", "command")
 PLACEHOLDERS = {"tbd", "?", "n/a", "na", "same as above", "todo", "-", "...", "…"}
 BEFORE_YOU_FIX = ("current_behaviour", "callers", "consumers", "earlier_fixes", "instances")
 MASKED_LINE = re.compile(r"^<[^<>]*masked>$", re.I)
-
-# A 40-hex run is a git SHA and stays allowed; 32 hex and 48+ hex are keys and secrets.
-HEX_KEY = re.compile(r"(?<![0-9a-fA-F])(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{48,})(?![0-9a-fA-F])")
-KEY_PATTERNS = [
-    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"),
-    re.compile(r"\b(?:ghp|gho|ghs|ghu|github_pat)_[A-Za-z0-9_]{20,}"),
-    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
-    re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{2,}"),
-    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
-]
-BASE64_RUN = re.compile(r"[A-Za-z0-9+/_-]{40,}={0,2}")
-
-
-def has_key_like(text):
-    if HEX_KEY.search(text) or any(p.search(text) for p in KEY_PATTERNS):
-        return True
-    for run in BASE64_RUN.findall(text):
-        # path-like and identifier-like runs are not secrets: a secret mixes cases and digits
-        if re.search(r"[a-z]", run) and re.search(r"[A-Z]", run) and re.search(r"\d", run):
-            return True
-    return False
-
 
 def walk(node, path=""):
     """Every (path, string) leaf; `commit` fields hold SHAs and are skipped for key checks by the caller."""

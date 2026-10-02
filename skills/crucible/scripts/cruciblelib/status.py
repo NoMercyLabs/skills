@@ -16,11 +16,7 @@ def unit_status(root, unit):
     return "done" if status == "done" else "partial"
 
 
-def cmd_status(args):
-    root = Root(args.root)
-    root.require_confirmed()
-    cfg = root.config()
-    state = root.state()
+def coverage_counts(root):
     counts, parents = {}, 0
     for unit in root.units():
         status = unit_status(root, unit)
@@ -28,13 +24,34 @@ def cmd_status(args):
             parents += 1
             continue
         counts[status] = counts.get(status, 0) + 1
+    return counts, parents
+
+
+def coverage_line(counts):
     total = sum(counts.values())
     done, carried = counts.get("done", 0), counts.get("carried", 0)
     detail = ", ".join(f"{n} {s}" for s, n in sorted(counts.items()) if s not in ("done", "carried"))
     line = f"coverage: {done} of {total} units done"
     if carried:
         line += f", {carried} carried"
-    print(line + (f" ({detail})" if detail else ""))
+    return line + (f" ({detail})" if detail else "")
+
+
+def tokens_line(cfg, state):
+    cap = cfg["budget"]["max_tokens"]
+    spent = state["tokens_spent"]
+    return f"tokens: {spent} of {cap if cap else 'no cap'}" + (" (over the cap)" if cap and spent > cap else "")
+
+
+def cmd_status(args):
+    root = Root(args.root)
+    root.require_confirmed()
+    cfg = root.config()
+    state = root.state()
+    counts, parents = coverage_counts(root)
+    total = sum(counts.values())
+    done, carried = counts.get("done", 0), counts.get("carried", 0)
+    print(coverage_line(counts))
     if parents:
         print(f"{parents} split parent{'s' if parents > 1 else ''} not counted")
     coverage = read_json(root.p("coverage.json"))
@@ -53,9 +70,7 @@ def cmd_status(args):
         print(f"goal {g['id']} {g['name']}: {by_goal.pop(g['id'], 0)}")
     for goal, n in sorted(by_goal.items(), key=str):
         print(f"goal {goal} (not in config): {n}")
-    cap = cfg["budget"]["max_tokens"]
-    spent = state["tokens_spent"]
-    print(f"tokens: {spent} of {cap if cap else 'no cap'}" + (" (over the cap)" if cap and spent > cap else ""))
+    print(tokens_line(cfg, state))
 
 
 def register(sub):

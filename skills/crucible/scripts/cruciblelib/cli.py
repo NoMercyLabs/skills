@@ -5,7 +5,7 @@ import sys
 from .common import CrucibleError
 
 # Each module exposes register(sub). A module that is not on disk yet is skipped so slices land one by one.
-COMMAND_MODULES = ["config", "inventory", "proof", "verdicts", "gate", "split", "status", "filing", "selftest"]
+COMMAND_MODULES = ["config", "answer", "permissions", "inventory", "proof", "verdicts", "gate", "split", "status", "filing", "selftest"]
 
 
 def load_modules(sub):

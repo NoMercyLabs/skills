@@ -3,10 +3,46 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import tempfile
 
 CONFIRM_HINT = ("config not confirmed: ask the user the interview questions "
                 "(references/interview.md), then run `crucible confirm`")
+
+# A 40-hex run is a git SHA and stays allowed; 32 hex and 48+ hex are keys and secrets.
+HEX_KEY = re.compile(r"(?<![0-9a-fA-F])(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{48,})(?![0-9a-fA-F])")
+KEY_PATTERNS = [
+    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"),
+    re.compile(r"\b(?:ghp|gho|ghs|ghu|github_pat)_[A-Za-z0-9_]{20,}"),
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{2,}"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+]
+BASE64_RUN = re.compile(r"[A-Za-z0-9+/_-]{40,}={0,2}")
+
+
+def has_key_like(text):
+    if HEX_KEY.search(text) or any(p.search(text) for p in KEY_PATTERNS):
+        return True
+    for run in BASE64_RUN.findall(text):
+        # path-like and identifier-like runs are not secrets: a secret mixes cases and digits
+        if re.search(r"[a-z]", run) and re.search(r"[A-Z]", run) and re.search(r"\d", run):
+            return True
+    return False
+
+
+def mask_secrets(text):
+    """Replace key-like strings with '<masked>' so a log or a written file never holds a secret."""
+    text = HEX_KEY.sub("<masked>", str(text))
+    for pattern in KEY_PATTERNS:
+        text = pattern.sub("<masked>", text)
+
+    def mask_run(match):
+        run = match.group(0)
+        mixed = re.search(r"[a-z]", run) and re.search(r"[A-Z]", run) and re.search(r"\d", run)
+        return "<masked>" if mixed else run
+
+    return BASE64_RUN.sub(mask_run, text)
 
 
 class CrucibleError(Exception):
