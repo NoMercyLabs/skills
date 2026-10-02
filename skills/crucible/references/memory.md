@@ -47,7 +47,9 @@ python scripts/crucible.py --root ROOT knowledge fetch SOURCE_NAME
 
 The engine writes Markdown into `ROOT/knowledge/SOURCE_NAME/`. Then absorb it: `index-docs --from ROOT/knowledge/SOURCE_NAME`.
 
-- Source kinds: `github` (the repo's issues, pull requests, discussions, wiki and releases, by read-only `gh` calls), `url` (a site or a git repository), `folder` (an export folder the user points at, for example a knowledge base or chat export).
+- Source kinds: `github` (the repo's issues, pull requests and discussions, by read-only `gh` calls; wiki and releases are not read), `url` (one public https page, as text), `folder` (an export folder the user points at, for example a knowledge base or chat export). A `git` source is recorded as not reached, with the advice to clone it and name its docs folder as a `folder` source.
+- A source is a name from `knowledge_sources`, or written inline as `github:OWNER/REPO`, `url:ADDRESS` or `folder:PATH`. The grant lists it in `sources=`, exactly as written. `knowledge list` shows each source and its status.
+- The command prints the `index-docs --from` line the memory step runs. It never runs it.
 - The fetch needs the `knowledge_sources` grant and is logged in `actions.log`.
 - Secrets are masked and privacy words refused before anything is written. A refusal stops the whole write for that source.
 - A source that cannot be reached is not skipped silently. The engine prints what the user can export and records the source as not absorbed. `crucible report` lists it with the reason.

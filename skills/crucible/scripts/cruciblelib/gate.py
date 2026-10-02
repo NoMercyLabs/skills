@@ -203,17 +203,20 @@ def check_finding(root, f, cfg=None):
     return problems
 
 
+def has_privacy_word(text, words):
+    """True when any of the lowercased privacy words stands alone in the text."""
+    lowered = text.lower()
+    return any(re.search(r"(?<![a-z0-9])" + re.escape(word) + r"(?![a-z0-9])", lowered) for word in words)
+
+
 def text_problems(f, cfg):
     problems = []
     words = [w.lower() for w in cfg.get("privacy_words", []) if str(w).strip()]
     for path, text in walk(f):
         if normalise(text).lower() in PLACEHOLDERS:
             problems.append(f"{path} is a placeholder ({text.strip()!r}); write the fact or 'not checked'")
-        lowered = text.lower()
-        for word in words:
-            if re.search(r"(?<![a-z0-9])" + re.escape(word) + r"(?![a-z0-9])", lowered):
-                problems.append(f"{path} holds a privacy word")
-                break
+        if has_privacy_word(text, words):
+            problems.append(f"{path} holds a privacy word")
         if path.rsplit(".", 1)[-1] == "commit":
             continue
         masked = "\n".join(ln for ln in text.split("\n") if not MASKED_LINE.match(ln.strip()))
