@@ -203,3 +203,24 @@ class LessonTests(LessonCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ActiveLessonReadByEngineTests(CrucibleCase):
+    def lesson(self, state):
+        return {"id": "L-aaaa1111", "target": "audit", "kind": "failure_signature", "signature": "s", "state": state,
+                "evidence": {"count": 3, "records": []}, "change": {"reader_addendum": "Check the error branch first."}}
+
+    def unit_addendum(self, root):
+        with open(os.path.join(root, "units", "svc-u01.json"), encoding="utf-8") as fh:
+            return json.load(fh).get("reader_addenda", [])
+
+    def test_active_lesson_read_by_engine(self):
+        root = self.make_inventoried({"a.py": "x = 1\n"})
+        self.assertEqual(self.unit_addendum(root), [])
+        save_lesson = lessons.save
+        save_lesson(Root(root), self.lesson("proposed"))
+        self.assertEqual(run(root, "inventory")[0], 0)
+        self.assertEqual(self.unit_addendum(root), [])
+        save_lesson(Root(root), self.lesson("active"))
+        self.assertEqual(run(root, "inventory")[0], 0)
+        self.assertEqual(self.unit_addendum(root), ["Check the error branch first."])

@@ -150,6 +150,10 @@ def cmd_inventory(args):
             total_units += 1
     root.save_state(state)
     write_json(root.p("coverage.json"), coverage)
+    from .lessons import reader_addenda
+    addenda = reader_addenda(root)
+    for name in root.units() if addenda else []:
+        write_json(root.p("units", name + ".json"), dict(root.unit(name), reader_addenda=addenda))
     from .system import apply_leads
     apply_leads(root)
     message = f"inventory: {total_units} units, {total_lines} lines, {len(cfg['repos'])} repos"

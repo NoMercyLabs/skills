@@ -99,6 +99,12 @@ def active(root):
     return [x for x in all_lessons(root) if x["state"] == "active"]
 
 
+def reader_addenda(root):
+    """The one-line addenda of the active audit lessons, in lesson id order; they go into each unit file."""
+    return [x["change"]["reader_addendum"] for x in active(root)
+            if x["target"] == "audit" and "reader_addendum" in x["change"]]
+
+
 def occurrences(root):
     """One row per failure in crucible's own records: the action log and, when present, failures.json."""
     rows = []
