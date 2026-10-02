@@ -1,10 +1,23 @@
 """The board plan, built from stored data only: areas from the system map and inventory units, stages from the
-user's goals, blockers and root-cause groups, severity and priority per finding. No tracker is called here."""
+user's goals, blockers and root-cause groups, severity, priority, size and owner per finding. `board propose`
+writes it for the user to approve; no tracker is called here."""
+import fnmatch
+import hashlib
+import json
+import os
+from collections import Counter
+
 from . import blockers, rootcause
-from .common import read_json
+from . import visibility as vis
+from .common import CrucibleError, Root, read_json, write_json
+from .config import git
+from .permissions import record_dryrun, refuse
 
 BLOCKERS_STAGE = "Blockers"
 CAUSES_STAGE = "Root causes that unblock other findings"
+UNASSIGNED = "unassigned"
+DATES_QUESTION = "Put dates on the stages? This needs your team speed; dates from estimates drift."
+CODEOWNERS_PATHS = ("CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")
 
 
 def build_areas(root, cfg):
@@ -66,14 +79,221 @@ def map_to_roadmap(stages, reasons, roadmap):
     return mapped, {fid: (target[stage], reason) for fid, (stage, reason) in reasons.items()}, mapping
 
 
+def cited(f):
+    """(file, first line, last line) of the finding's root cause, else of its first location; None if unparsable."""
+    chain = f.get("chain") if isinstance(f.get("chain"), dict) else {}
+    ref = (chain.get("root_cause") or {}).get("ref") or next((w.get("ref") for w in f.get("where") or []), "")
+    return rootcause.ref_key(ref) if ref else None
+
+
+def codeowners_match(pattern, rel):
+    anchored = pattern.startswith("/") or "/" in pattern.rstrip("/")
+    pattern = pattern.lstrip("/")
+    if pattern.endswith("/") or "*" not in pattern and "." not in os.path.basename(pattern):
+        pattern = pattern.rstrip("/")
+        return rel.startswith(pattern + "/") if anchored else f"/{pattern}/" in f"/{rel}"
+    return fnmatch.fnmatch(rel, pattern) if anchored else fnmatch.fnmatch(os.path.basename(rel), pattern)
+
+
+def codeowners_owner(entry, rel):
+    """(owners, CODEOWNERS file) of the last rule matching rel, or None. Rules are the simple glob form."""
+    for name in CODEOWNERS_PATHS:
+        full = os.path.join(entry["path"], *name.split("/"))
+        if not os.path.isfile(full):
+            continue
+        found = None
+        with open(full, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                parts = line.split("#", 1)[0].split()
+                if len(parts) > 1 and codeowners_match(parts[0], rel):
+                    found = ", ".join(parts[1:])
+        return (found, name) if found else None
+    return None
+
+
+def history_owner(entry, key):
+    """The author with most commits on the cited lines, or None when the repo is no git repo or has no history."""
+    if not os.path.exists(os.path.join(entry["path"], ".git")):
+        return None
+    rel, a, b = key
+    out = git(entry["path"], "log", "-L", f"{a},{b}:{rel}", "-s", "--format=%aN")
+    authors = Counter(line for line in out.splitlines() if line.strip())
+    return authors.most_common(1)[0][0] if authors else None
+
+
+def resolve_owner(cfg, f):
+    """-> (owner, source). CODEOWNERS, then git history of the cited lines, then the user's answer, else unassigned."""
+    entry = next((r for r in cfg.get("repos", []) if r["name"] == f["repo"]), None)
+    key = cited(f)
+    if entry and key:
+        rule = codeowners_owner(entry, key[0])
+        if rule:
+            return rule
+        author = history_owner(entry, key)
+        if author:
+            return author, f"git log of {rootcause.ref_text(key)}"
+    row = (cfg.get("owners") or {}).get(f["repo"])
+    assignee = row.get("assignee") if isinstance(row, dict) else row
+    if assignee:
+        return assignee, "the user's owners answer"
+    return UNASSIGNED, "none found"
+
+
 def build_board(root, cfg=None, findings=None):
-    """-> {areas, stages, mapping, items}; items is by finding id: stage, reason, severity, priority."""
+    """-> {areas, stages, mapping, items}; items is by finding id: stage, reason, severity, priority, area, size,
+    owner with its source, and the finding's visibility."""
     cfg = cfg or root.config()
     findings = root.findings() if findings is None else findings
     stages, reasons = generated_stages(root, cfg, findings)
     mapping = []
     if cfg.get("stages"):
         stages, reasons, mapping = map_to_roadmap(stages, reasons, cfg["stages"])
-    items = {fid: {"stage": reasons[fid][0], "reason": reasons[fid][1], "severity": f["severity"],
-                   "priority": goal_rank(cfg, f["goal"])} for fid, f in sorted(findings.items())}
+    items = {}
+    for fid, f in sorted(findings.items()):
+        owner, owner_source = resolve_owner(cfg, f)
+        items[fid] = {"stage": reasons[fid][0], "reason": reasons[fid][1], "severity": f["severity"],
+                      "priority": goal_rank(cfg, f["goal"]), "area": f["repo"], "size": f["size"],
+                      "owner": owner, "owner_source": owner_source, "visibility": f.get("visibility", "public")}
     return {"areas": build_areas(root, cfg), "stages": stages, "mapping": mapping, "items": items}
+
+
+def research_problems(findings):
+    if not findings:
+        return ["no accepted findings: read and verify the units first, then propose the board"]
+    return [f"{fid}: the root cause is not verified" for fid, f in sorted(findings.items())
+            if f.get("root_cause_verified") is not True]
+
+
+def dates_mode(cfg):
+    return cfg.get("board_dates") or "none"
+
+
+def wanted_fields(cfg, result):
+    items = list(result["items"].values())
+    stage_source = "your roadmap" if result["mapping"] else "blockers, shared root causes and your goal order"
+    owners = {i["owner"]: i["owner_source"] for i in items}
+    fields = [
+        ("Area", [(a["name"], a["source"]) for a in result["areas"]]),
+        ("Stage", [(s["name"], stage_source) for s in result["stages"]]),
+        ("Severity", [(v, "the verified finding severity") for v in sorted({i["severity"] for i in items})]),
+        ("Priority", [(v, "your goal order") for v in sorted({i["priority"] for i in items})]),
+        ("Size", [(v, "the finding's fix size") for v in sorted({i["size"] for i in items})]),
+        ("Owner", [(o, owners[o]) for o in sorted(owners)]),
+    ]
+    if dates_mode(cfg) == "estimates":
+        fields.append(("Target date", []))
+    return fields
+
+
+def map_fields(cfg, wanted):
+    """Keep every field the board already has: map onto it by name and propose only the missing options."""
+    existing = (cfg.get("tracker") or {}).get("fields") or {}
+    by_lower = {name.lower(): name for name in existing}
+    fields, used = [], set()
+    for name, values in wanted:
+        values = [{"value": v, "source": source} for v, source in values]
+        found = by_lower.get(name.lower())
+        have = [str(o) for o in existing.get(found, [])] if found else []
+        fields.append({"name": name, "values": values, "action": "map" if found else "add",
+                       "existing": found or "",
+                       "add_values": [v["value"] for v in values if str(v["value"]) not in have]})
+        used.add(found)
+    return fields, sorted(set(existing) - used)
+
+
+def build_views(result, private_board):
+    views = [{"name": "Start here", "group_by": "Stage", "filter": f"Stage = {result['stages'][0]['name']}"},
+             {"name": "By stage", "group_by": "Stage", "filter": ""},
+             {"name": "By repo", "group_by": "Area", "filter": ""},
+             {"name": "By owner", "group_by": "Owner", "filter": ""}]
+    if private_board:
+        views.append({"name": "Security", "group_by": "Severity", "filter": "finding visibility = private"})
+    return views
+
+
+def proposal_hash(plan):
+    text = json.dumps({k: v for k, v in plan.items() if k != "hash"}, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def build_proposal(root, cfg=None, findings=None):
+    cfg = cfg or root.config()
+    findings = root.findings() if findings is None else findings
+    problems = research_problems(findings)
+    if problems:
+        raise CrucibleError("refused: the board is proposed after the research (findings verified and grouped by "
+                            "root cause): " + "; ".join(problems))
+    result = build_board(root, cfg, findings)
+    groups = rootcause.group_by_root_cause(findings)
+    key = vis.board_key(cfg)
+    fields, kept = map_fields(cfg, wanted_fields(cfg, result))
+    plan = {"research": {"findings": len(findings), "root_causes": len(groups),
+                         "shared": sum(1 for g in groups if len(g["findings"]) > 1),
+                         "open_blockers": sum(1 for b in blockers.load(root) if b["status"] == "open")},
+            "board": key, "dates": dates_mode(cfg), "fields": fields, "existing_kept": kept,
+            "stages": result["stages"], "mapping": result["mapping"], "items": result["items"],
+            "views": build_views(result, bool(key) and vis.confirmed(cfg, key) == "private")}
+    plan["hash"] = proposal_hash(plan)
+    return plan
+
+
+def render_proposal(plan):
+    r = plan["research"]
+    lines = [f"research: {r['findings']} findings, every root cause verified, {r['root_causes']} root causes "
+             f"({r['shared']} shared by several findings), {r['open_blockers']} open blockers"]
+    for field in plan["fields"]:
+        what = f"maps onto your field {field['existing']!r}" if field["action"] == "map" else "new field"
+        lines.append(f"field {field['name']}: {what}; adds values: "
+                     f"{', '.join(map(str, field['add_values'])) or 'none'}")
+        lines += [f"  {v['value']} (source: {v['source']})" for v in field["values"]]
+    if plan["existing_kept"]:
+        lines.append("existing fields kept untouched: " + ", ".join(plan["existing_kept"]))
+    for stage in plan["stages"]:
+        lines.append(f"stage {stage['name']}: {len(stage['findings'])} findings, blockers: "
+                     f"{', '.join(stage['blockers']) or 'none'}")
+        lines += [f"  {fid}: {plan['items'][fid]['reason']}" for fid in stage["findings"]]
+    lines += [f"roadmap: {m['generated']} -> {m['roadmap']} ({m['why']})" for m in plan["mapping"]]
+    lines += [f"item {fid}: size {i['size']}, owner {i['owner']} ({i['owner_source']})"
+              for fid, i in sorted(plan["items"].items())]
+    lines += [f"view {v['name']}: group by {v['group_by']}" + (f", where {v['filter']}" if v["filter"] else "")
+              for v in plan["views"]]
+    lines += [f"dates: {plan['dates']}", DATES_QUESTION + " (`crucible answer board_dates none|estimates`)"]
+    return "\n".join(lines)
+
+
+def plan_path(root):
+    return root.p("board", "plan.json")
+
+
+def require_approved_plan(root, cfg):
+    """The gate `file --apply` calls when the tracker is a board: the current board plan must be approved."""
+    if not vis.board_key(cfg):
+        return
+    stored = read_json(plan_path(root))
+    if not stored:
+        refuse(root, "tracker_board", "apply", "no board plan: run `crucible board propose`, show it to the user, "
+                                               "then `crucible approve HASH`")
+    if proposal_hash(build_proposal(root, cfg)) != stored["hash"]:
+        refuse(root, "tracker_board", "apply", "the board plan is out of date: run `crucible board propose` again")
+    approved = read_json(root.p("approvals.json"), [])
+    if stored["hash"] not in [row["hash"] for row in approved]:
+        refuse(root, "tracker_board", "apply", "the board plan is not approved: show it to the user, then run "
+                                               f"`crucible approve {stored['hash']}`")
+
+
+def cmd_propose(args):
+    root = Root(args.root)
+    root.require_confirmed()
+    plan = build_proposal(root)
+    write_json(plan_path(root), plan)
+    record_dryrun(root, plan["hash"], plan)
+    print(render_proposal(plan))
+    print(f"plan hash: {plan['hash']}")
+    print(f"show this plan to the user; after their go run `crucible approve {plan['hash']}`; nothing is created "
+          "on the board before that")
+
+
+def register(sub):
+    p = sub.add_parser("board", help="propose the board from the research")
+    p.add_argument("action", choices=("propose",), help="propose: write board/plan.json and print it")
+    p.set_defaults(func=cmd_propose)

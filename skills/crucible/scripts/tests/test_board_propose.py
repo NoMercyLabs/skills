@@ -88,8 +88,9 @@ class ResearchGateTests(ProposeCase):
         self.assertIn("F-003: goal 1: users can use the product without help", out)
 
     def test_existing_board_fields_are_mapped_and_only_additions_proposed(self):
-        tracker = dict(BOARD, fields={"stage": ["Goal 3: features"], "Status": ["Todo"]})
+        tracker = dict(BOARD, fields={"stage": ["Goal 3: stability"], "Status": ["Todo"]})
         root = self.proposed([finding("F-001", 40)], tracker=tracker)
+        self.propose(root)
         fields = {f["name"]: f for f in self.plan(root)["fields"]}
         self.assertEqual(fields["Stage"]["action"], "map")
         self.assertEqual(fields["Stage"]["existing"], "stage")

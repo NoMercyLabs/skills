@@ -119,7 +119,8 @@ class PlacementTests(FilingCase):
 
     def test_private_never_on_public_board(self):
         self.gh.boards[("acme", "7")] = "public"
-        root = self.ready([self.private(), self.finding(1)], auto="true", tracker=BOARD,
+        findings = [dict(f, root_cause_verified=True) for f in (self.private(), self.finding(1))]
+        root = self.ready(findings, auto="true", tracker=BOARD,
                           flags={"public_board_items": "true"},
                           confirmed={"acme/priv": "private", "board:acme/7": "public"},
                           grants={"tracker_issues": ["repos=acme/svc,acme/priv", "max_count=10"],
@@ -132,6 +133,9 @@ class PlacementTests(FilingCase):
         with self.assertRaises(CrucibleError) as ctx:
             recheck_visibility(Root(root), Root(root).config(), github.GitHub(), action)
         self.assertIn("never go on a public board", str(ctx.exception))
+        self.assertEqual(run(root, "board", "propose")[0], 0)
+        with open(os.path.join(root, "board", "plan.json"), encoding="utf-8") as fh:
+            self.assertEqual(run(root, "approve", json.load(fh)["hash"])[0], 0)
         self.filed_everything(root)
         urls = [u for _, u in self.gh.board_items]
         self.assertTrue(urls)

@@ -6,7 +6,7 @@ it, never reaches a public destination; a public pointer says only that a privat
 import hashlib
 import json
 
-from . import rootcause
+from . import board, rootcause
 from . import visibility as vis
 from .common import CrucibleError, Root, read_json, write_json
 from .permissions import (authorize, dryrun_hashes, log_action, record_dryrun, refuse, require_approved,
@@ -194,6 +194,7 @@ def quota(actions):
 def cmd_apply(root):
     root.require_confirmed()
     cfg = root.config()
+    board.require_approved_plan(root, cfg)
     actions = build_plan(root, cfg)
     digest = plan_hash(actions)
     if digest not in dryrun_hashes(root):

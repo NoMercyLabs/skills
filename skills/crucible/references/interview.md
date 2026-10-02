@@ -53,6 +53,13 @@ Ask this first, before scope. The audit must never work against the user, so it 
 - **Key**: `stages`.
 - **Ask**: "Do you have roadmap stages findings should be placed on? List them, or say none."
 
+## 3b. Dates on the stages
+
+- **Why**: dates need the team speed, and dates from estimates drift. `crucible board propose` asks this after the research, not before.
+- **Default**: `none`. The value is `none` or `estimates`.
+- **Key**: `board_dates` (a plain setting; it is not part of the interview order, and `confirm` does not wait for it).
+- **Ask**: "Put dates on the stages? This needs your team speed; dates from estimates drift."
+
 ## 4. Tracker
 
 - **Why**: filed findings go to exactly one place, and the user owns that place.

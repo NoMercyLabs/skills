@@ -55,6 +55,7 @@ python scripts/crucible.py --root ROOT next
 - `grant GROUP yes|no` records `{answer, words, bounds, at}` in `config.permissions[GROUP]`. `--words` is the user's own text; never write it for them. `--bound key=value` is repeatable. Bound keys: `repos`, `max_count`, `labels`, `assignees`, `instance`, `kinds`, `sources`, `targets`, `commands`, `mode`.
 - A `no` is final. A later `grant GROUP yes` is refused unless `--reopen` is given together with the user's own `--words`. Do not ask again in another form, and do not look for another action that reaches the same result.
 - `approve PLAN_HASH` records the user's go for exactly that plan. A changed plan has a new hash and needs a new approval.
+- `board propose` writes `board/plan.json`, prints every field, value, stage, view and roadmap mapping with its source, and prints a plan hash. That hash is approved with `approve` like a dry run. When the tracker is a board, `file --apply` refuses until the current board plan has an approved hash, even when `auto_file` is on.
 - `answer` and `next` are the interview commands (see `interview.md`).
 - `confirm` refuses until every group has an answer, and also until the memory, filing and blocker-fix choices are answered. Its message lists what is missing.
 
