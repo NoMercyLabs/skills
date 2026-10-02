@@ -1,12 +1,12 @@
 import argparse
 import sys
 
-from . import answer, brief, config, explore, filing, gate, inventory, permissions, proof, rootcause, safety, split, status, system, verdicts, visibility
+from . import answer, brief, config, explore, filing, gate, inventory, permissions, prefill, proof, rootcause, safety, split, status, system, verdicts, visibility
 from .common import CrucibleError
 
 # Each module exposes register(sub); a command module lands with its slice and is added here.
 COMMAND_MODULES = [config, answer, brief, permissions, inventory, proof, verdicts, gate, split, status, visibility, filing,
-                   safety, system, explore, rootcause]
+                   safety, system, explore, rootcause, prefill]
 
 
 def load_modules(sub):

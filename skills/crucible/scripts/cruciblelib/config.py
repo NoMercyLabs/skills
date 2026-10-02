@@ -7,7 +7,7 @@ import subprocess
 
 from . import brief
 from .answer import missing_for_confirm
-from .common import CrucibleError, Root, split_lines, write_json
+from .common import mask_secrets, CrucibleError, Root, split_lines, write_json
 from .inventory import walk_text_files
 
 LANGUAGES = {
@@ -113,6 +113,21 @@ def grimoira_status():
     return ""
 
 
+def grimoira_lookup(words):
+    """[{"source", "quote"}] from the grimoira command's recall verb; empty when the command is missing."""
+    exe = shutil.which("grimoira")
+    if not exe:
+        return []
+    try:
+        done = subprocess.run([exe, "recall", " ".join(words)], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if done.returncode != 0:
+        return []
+    return [{"source": "grimoira recall", "quote": mask_secrets(line.strip()[:MAX_QUOTE])}
+            for line in done.stdout.split("\n") if line.strip()][:3]
+
+
 def render_memory():
     found = grimoira_status()
     if found == "command":
@@ -176,7 +191,8 @@ def cmd_detect(args):
 
 
 def cmd_summary(args):
-    cfg = Root(args.root).config()
+    root = Root(args.root)
+    cfg = root.config()
     lines = [f"confirmed: {cfg['confirmed']}"]
     lines += [render(r) for r in cfg["repos"]]
     lines.append("scope include: " + (", ".join(cfg["scope"]["include"]) or "everything"))
@@ -197,6 +213,8 @@ def cmd_summary(args):
     lines.append("file findings automatically: " + ("not answered" if auto is None else "yes" if auto else "no"))
     lines.append("backups: " + ("on" if cfg.get("backups", {}).get("enabled", True) else "off"))
     lines.append("permissions: " + ", ".join(f"{g} {r['answer']}" for g, r in cfg.get("permissions", {}).items()))
+    from .prefill import summary_lines
+    lines += summary_lines(root)
     print("\n".join(lines))
 
 

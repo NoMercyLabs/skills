@@ -9,7 +9,7 @@ from .status import coverage_counts, coverage_line, repo_coverage_lines, tokens_
 
 GROUPS = ("local_reads", "agent_runs", "installs", "memory_writes", "tracker_board", "tracker_labels",
           "tracker_issues", "tracker_advisories", "tracker_assignees", "tracker_comments", "live_checks",
-          "publish_report", "blocker_fixes", "transcripts", "workspace_clones", "knowledge_sources")
+          "publish_report", "blocker_fixes", "transcripts", "workspace_clones", "history", "knowledge_sources")
 
 # What each group lets the run do, what it costs and where the data goes: the plan prints these verbatim.
 GROUP_INFO = {
@@ -39,6 +39,9 @@ GROUP_INFO = {
                     "none", "stays on this machine; the conversation and the tool output are never read out"),
     "workspace_clones": ("clone the named repos read-only into the chosen fresh base folder", "disk for the clones",
                          "the clones stay on this machine; the user's own checkouts are never touched"),
+    "history": ("read only the user's own past messages in the agent history of the listed repos, to find answers "
+                "already given", "none", "stays on this machine; only the matched quote, its source and its date "
+                "are kept, never the assistant's text or tool output"),
     "knowledge_sources": ("pull the named outside sources into the audit folder", "none",
                           "read-only requests to the named sources"),
 }
