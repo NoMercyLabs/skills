@@ -1,0 +1,265 @@
+import glob
+import os
+import re
+
+from .common import CrucibleError, Root, read_json
+
+SEVERITIES = ("critical", "high", "medium", "low")
+SIZES = ("S", "M", "L")
+KINDS = ("file", "route", "screen", "workflow", "config", "other")
+FREQUENCIES = ("always", "often", "sometimes", "once", "unknown")
+EVIDENCE_KINDS = ("file_line", "command")
+PLACEHOLDERS = {"tbd", "?", "n/a", "na", "same as above", "todo", "-", "...", "…"}
+BEFORE_YOU_FIX = ("current_behaviour", "callers", "consumers", "earlier_fixes", "instances")
+MASKED_LINE = re.compile(r"^<[^<>]*masked>$", re.I)
+
+# A 40-hex run is a git SHA and stays allowed; 32 hex and 48+ hex are keys and secrets.
+HEX_KEY = re.compile(r"(?<![0-9a-fA-F])(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{48,})(?![0-9a-fA-F])")
+KEY_PATTERNS = [
+    re.compile(r"\bsk-[A-Za-z0-9_-]{16,}"),
+    re.compile(r"\b(?:ghp|gho|ghs|ghu|github_pat)_[A-Za-z0-9_]{20,}"),
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{2,}"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+]
+BASE64_RUN = re.compile(r"[A-Za-z0-9+/_-]{40,}={0,2}")
+
+
+def has_key_like(text):
+    if HEX_KEY.search(text) or any(p.search(text) for p in KEY_PATTERNS):
+        return True
+    for run in BASE64_RUN.findall(text):
+        # path-like and identifier-like runs are not secrets: a secret mixes cases and digits
+        if re.search(r"[a-z]", run) and re.search(r"[A-Z]", run) and re.search(r"\d", run):
+            return True
+    return False
+
+
+def walk(node, path=""):
+    """Every (path, string) leaf; `commit` fields hold SHAs and are skipped for key checks by the caller."""
+    if isinstance(node, str):
+        yield path, node
+    elif isinstance(node, list):
+        for i, value in enumerate(node):
+            yield from walk(value, f"{path}[{i}]")
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            if str(key).startswith("_"):
+                continue
+            yield from walk(value, f"{path}.{key}" if path else str(key))
+
+
+def normalise(text):
+    return " ".join(text.split())
+
+
+def parse_ref(ref):
+    """'path:12' or 'path:12-15' -> (path, a, b) or None."""
+    m = re.match(r"^(.+?):(\d+)(?:-(\d+))?$", ref.strip())
+    if not m:
+        return None
+    a = int(m.group(2))
+    return m.group(1), a, int(m.group(3) or a)
+
+
+def snapshot_range(root, repo, path, a, b):
+    """Text of lines a..b of the snapshot, or None when the file or lines do not exist."""
+    try:
+        lines = root.snapshot_lines(repo, path)
+    except CrucibleError:
+        return None
+    if a < 1 or b < a or b > len(lines):
+        return None
+    return normalise(" ".join(lines[a - 1:b]))
+
+
+def quote_found(quote, text):
+    for line in str(quote).split("\n"):
+        line = normalise(line)
+        if not line or MASKED_LINE.match(line):
+            continue
+        if line not in text:
+            return False
+    return True
+
+
+def need_text(problems, value, name):
+    if not isinstance(value, str) or not value.strip():
+        problems.append(f"{name} is empty")
+        return False
+    return True
+
+
+def need_group(problems, f, name, fields):
+    group = f.get(name)
+    if not isinstance(group, dict):
+        problems.append(f"{name} is missing")
+        return {}
+    for field in fields:
+        need_text(problems, group.get(field), f"{name}.{field}")
+    return group
+
+
+def need_list(problems, value, name, minimum=1):
+    if not isinstance(value, list) or len(value) < minimum:
+        problems.append(f"{name} needs at least {minimum} entry")
+        return []
+    return value
+
+
+def check_evidence(root, f, problems):
+    """-> number of file_line evidence entries whose quote exists at the cited snapshot lines."""
+    good = 0
+    for i, ev in enumerate(need_list(problems, f.get("evidence"), "evidence")):
+        name = f"evidence[{i}]"
+        if not isinstance(ev, dict):
+            problems.append(f"{name} is not an object")
+            continue
+        if ev.get("kind") not in EVIDENCE_KINDS:
+            problems.append(f"{name}.kind must be one of {', '.join(EVIDENCE_KINDS)}")
+        ok_ref, ok_quote = need_text(problems, ev.get("ref"), f"{name}.ref"), need_text(problems, ev.get("quote"), f"{name}.quote")
+        if ev.get("kind") != "file_line" or not (ok_ref and ok_quote):
+            continue
+        parsed = parse_ref(ev["ref"])
+        if not parsed:
+            problems.append(f"{name}.ref {ev['ref']!r} is not path:line")
+            continue
+        text = snapshot_range(root, f.get("repo", ""), *parsed)
+        if text is None:
+            problems.append(f"{name}: {ev['ref']} is not in the snapshot (file missing or line past the end)")
+        elif not quote_found(ev["quote"], text):
+            problems.append(f"{name}: the quote is not at {ev['ref']} in the snapshot")
+        else:
+            good += 1
+    return good
+
+
+def check_finding(root, f, cfg=None):
+    """-> list of problems; empty means PASS."""
+    cfg = cfg or root.config()
+    problems = []
+    if not isinstance(f, dict):
+        return ["finding is not an object"]
+    for field in ("id", "repo", "area"):
+        need_text(problems, f.get(field), field)
+    title = f.get("title")
+    if need_text(problems, title, "title") and not 10 <= len(title) <= 120:
+        problems.append("title must be 10-120 characters")
+    goals = {g["id"] for g in cfg.get("goals", [])}
+    if f.get("goal") not in goals:
+        problems.append(f"goal must be one of the config goal ids {sorted(goals)}")
+    if f.get("severity") not in SEVERITIES:
+        problems.append(f"severity must be one of {', '.join(SEVERITIES)}")
+    if f.get("size") not in SIZES:
+        problems.append("size must be S, M or L")
+    stages = list(cfg.get("stages", [])) + ["none"]
+    if f.get("stage") not in stages:
+        problems.append(f"stage must be one of {', '.join(stages)}")
+    need_group(problems, f, "who", ("affected", "owner"))
+    need_group(problems, f, "what", ("summary", "observed", "expected"))
+    for i, w in enumerate(need_list(problems, f.get("where"), "where")):
+        if not isinstance(w, dict) or w.get("kind") not in KINDS:
+            problems.append(f"where[{i}].kind must be one of {', '.join(KINDS)}")
+        else:
+            need_text(problems, w.get("ref"), f"where[{i}].ref")
+    when = need_group(problems, f, "when", ("trigger",))
+    if when and when.get("frequency") not in FREQUENCIES:
+        problems.append(f"when.frequency must be one of {', '.join(FREQUENCIES)}")
+    why = need_group(problems, f, "why", ("cause",))
+    if why and not isinstance(why.get("verified"), bool):
+        problems.append("why.verified must be true or false")
+    how = need_group(problems, f, "how", ("fix", "prove"))
+    for i, step in enumerate(need_list(problems, how.get("reproduce") if how else None, "how.reproduce")):
+        need_text(problems, step, f"how.reproduce[{i}]")
+    good_evidence = check_evidence(root, f, problems)
+    for i, s in enumerate(need_list(problems, f.get("siblings"), "siblings")):
+        need_text(problems, s, f"siblings[{i}]")
+    not_checked = f.get("not_checked")
+    if not isinstance(not_checked, list):
+        problems.append("not_checked must be a list (empty when everything was checked)")
+        not_checked = []
+    if why and why.get("verified") is True and good_evidence == 0:
+        problems.append("why.verified is true but no file_line evidence quote exists at real lines")
+    if why and why.get("verified") is False and not any(str(n).startswith("cause:") for n in not_checked):
+        problems.append("why.verified is false: not_checked needs an entry starting 'cause:'")
+    if "before_you_fix" in f:
+        block = f["before_you_fix"]
+        for field in BEFORE_YOU_FIX:
+            need_text(problems, block.get(field) if isinstance(block, dict) else None, f"before_you_fix.{field}")
+    problems += text_problems(f, cfg)
+    return problems
+
+
+def text_problems(f, cfg):
+    problems = []
+    words = [w.lower() for w in cfg.get("privacy_words", []) if str(w).strip()]
+    for path, text in walk(f):
+        if normalise(text).lower() in PLACEHOLDERS:
+            problems.append(f"{path} is a placeholder ({text.strip()!r}); write the fact or 'not checked'")
+        lowered = text.lower()
+        for word in words:
+            if re.search(r"(?<![a-z0-9])" + re.escape(word) + r"(?![a-z0-9])", lowered):
+                problems.append(f"{path} holds a privacy word")
+                break
+        if path.rsplit(".", 1)[-1] == "commit":
+            continue
+        masked = "\n".join(ln for ln in text.split("\n") if not MASKED_LINE.match(ln.strip()))
+        if has_key_like(masked):
+            problems.append(f"{path} holds a key-like string; replace it with a line '<token, masked>'")
+    return problems
+
+
+def finding_files(root, explicit, candidates):
+    """[(label, finding)] for the gate to judge."""
+    out = []
+    if explicit:
+        for path in explicit:
+            data = read_json(path)
+            if data is None:
+                raise CrucibleError(f"no such file: {path}")
+            for i, item in enumerate(data if isinstance(data, list) else [data]):
+                out.append((f"{path}#{i}" if isinstance(data, list) else path, item))
+        return out
+    if candidates:
+        for path in sorted(glob.glob(root.p("candidates", "*.json"))):
+            unit = os.path.basename(path)[:-5]
+            for i, item in enumerate(read_json(path, [])):
+                title = item.get("title", "") if isinstance(item, dict) else ""
+                out.append((f"{unit}[{i}] {title[:40]}", item))
+        return out
+    return [(fid, f) for fid, f in root.findings().items()]
+
+
+def run_gate(root, items):
+    """Print PASS or FAIL per item; -> number of failures."""
+    cfg = root.config()
+    failed = 0
+    for label, f in items:
+        problems = check_finding(root, f, cfg)
+        if problems:
+            failed += 1
+            print(f"FAIL {label}")
+            for p in problems:
+                print(f"  {p}")
+        else:
+            print(f"PASS {label}")
+    return failed
+
+
+def cmd_gate(args):
+    root = Root(args.root)
+    root.require_confirmed()
+    items = finding_files(root, args.finding, args.candidates)
+    if not items:
+        print("gate: nothing to check")
+        return 0
+    failed = run_gate(root, items)
+    print(f"gate: {len(items) - failed} of {len(items)} pass")
+    return 1 if failed else 0
+
+
+def register(sub):
+    p = sub.add_parser("gate", help="check findings against the schema, privacy words and key-like strings")
+    p.add_argument("finding", nargs="*", help="finding JSON files (default: every accepted finding)")
+    p.add_argument("--candidates", action="store_true", help="check every candidate instead")
+    p.set_defaults(func=cmd_gate)
