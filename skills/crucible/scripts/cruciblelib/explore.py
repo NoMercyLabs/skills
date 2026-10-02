@@ -17,8 +17,8 @@ KEYWORDS = {"if", "for", "while", "switch", "catch", "return", "def", "function"
             "with", "and", "or", "not", "in", "is", "await", "async", "new", "throw", "lambda", "yield", "assert",
             "except", "try", "match", "case", "sizeof", "typeof", "using", "foreach", "when"}
 DEF_PATTERNS = (
-    r"^\s*(?:export\s+|async\s+|public\s+|private\s+|protected\s+|static\s+|final\s+|abstract\s+)*"
-    r"(?:def|function\*?|func|fn|class|sub|proc)\s+([A-Za-z_]\w*)",
+    r"^\s*(?:export\s+|async\s+|public\s+|private\s+|protected\s+|static\s+|final\s+|abstract\s+|override\s+|open\s+|internal\s+|suspend\s+)*"
+    r"(?:def|function\*?|func|fun|fn|class|sub|proc)\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)",
     r"^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?(?:\([^)]*\)\s*=>|function\b|[A-Za-z_]\w*\s*=>)",
     r"^\s*(?!(?:return|else|new|throw|await|yield|print|elif|del|raise|assert|case)\b)"
     r"(?:(?:public|private|protected|static|final|async|override|virtual|internal)\s+)*"
@@ -35,6 +35,8 @@ STRING_RE = re.compile(r"([\"'])(?:\\.|(?!\1).)*\1")
 FIX_RE = re.compile(r"\b(fix\w*|revert\w*|hotfix|bug)\b", re.IGNORECASE)
 CALL_RE = re.compile(r"\b([A-Za-z_]\w*)\s*\(")
 ASSIGN_RE = re.compile(r"^\s*(?:(?:const|let|var|final|val)\s+)?([A-Za-z_][\w.]*)\s*(?::=|=)(?!=)\s*(.+)$")
+SYMBOL_EXTENSIONS = {".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".cs", ".java", ".kt", ".kts", ".php", ".go",
+                     ".rs", ".rb"}  # the languages with a tested fixture; any other extension gets no caller list
 LIMIT = 30
 
 
@@ -146,7 +148,9 @@ def cmd_explore(args):
         raise CrucibleError(f"{rel} has no line {line_no} (it has {len(lines)} lines)")
     corpus = Corpus(cfg)
     here = corpus.ref(repo["name"], rel, line_no)
-    found = find_def(lines, line_no)
+    ext = os.path.splitext(rel)[1].lower()
+    supported = ext in SYMBOL_EXTENSIONS
+    found = find_def(lines, line_no) if supported else None
     if found:
         start, name = found
         end = max(span_end(lines, start), line_no)
@@ -156,6 +160,8 @@ def cmd_explore(args):
     print(f"explore {here}: {lines[line_no - 1].strip()[:160]}")
     if name:
         print(f"symbol: {name} ({corpus.ref(repo['name'], rel, start)}) lines {start}-{end}")
+    elif not supported:
+        print(f"symbol: not detected: symbol detection not supported for {ext or rel}: callers not listed")
     else:
         print("symbol: none found above this line (no definition pattern matched); facts below use the line only")
     span = [(no, lines[no - 1]) for no in range(start, end + 1)]
@@ -164,7 +170,10 @@ def cmd_explore(args):
     if name:
         rx = re.compile(r"\b" + re.escape(name) + r"\s*\(")
         callers = [(ref, text) for ref, text in corpus.grep(rx) if not is_def_of(text, name)]
-    section("callers", [f"{ref}: {text}" for ref, text in callers], "none found by search")
+    if supported:
+        section("callers", [f"{ref}: {text}" for ref, text in callers], "none found by search")
+    else:
+        print(f"callers: symbol detection not supported for {ext or rel}: callers not listed")
     for ref, _text in callers[:5]:
         print(f"  next: crucible explore {ref}")
 

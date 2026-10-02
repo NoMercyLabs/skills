@@ -76,3 +76,66 @@ class ExploreCase(CrucibleCase):
         code, out, err = run(root, "explore", "nowhere.py:1")
         self.assertEqual(code, 1)
         self.assertIn("not in", err)
+
+
+# (extension, definition file text with the body literal on line BODY_LINE, caller file text) per claimed language.
+LANGUAGES = {
+    "js": ("function pick(items) {\n  const n = 5;\n  return items.slice(0, n);\n}\n", "const out = pick(list);\n"),
+    "ts": ("export function pick(items: string[]): string[] {\n  const n = 5;\n  return items.slice(0, n);\n}\n",
+           "const out = pick(list);\n"),
+    "tsx": ("export const pick = (items: string[]) => {\n  const n = 5;\n  return items.slice(0, n);\n};\n",
+            "const out = pick(list);\n"),
+    "cs": ("class Svc\n{\n    public int Pick(int[] items)\n    {\n        var n = 5;\n        return n;\n    }\n}\n",
+           "var x = svc.Pick(items);\n"),
+    "java": ("class Svc {\n    public int pick(int[] items) {\n        int n = 5;\n        return n;\n    }\n}\n",
+             "int x = svc.pick(items);\n"),
+    "kt": ("class Svc {\n    fun pick(items: List<Int>): Int {\n        val n = 5\n        return n\n    }\n}\n",
+           "val x = svc.pick(items)\n"),
+    "php": ("<?php\nclass Svc {\n    public function pick($items) {\n        $n = 5;\n        return $n;\n    }\n}\n",
+            "<?php\n$x = $svc->pick($items);\n"),
+    "go": ("package main\n\nfunc pick(items []int) int {\n\tn := 5\n\treturn n\n}\n", "package main\n\nvar x = pick(items)\n"),
+    "go-method": ("package main\n\nfunc (s *Svc) pick(items []int) int {\n\tn := 5\n\treturn n\n}\n",
+                  "package main\n\nvar x = svc.pick(items)\n"),
+    "rs": ("fn pick(items: &[i32]) -> i32 {\n    let n = 5;\n    n\n}\n", "fn main() {\n    let x = pick(&items);\n}\n"),
+    "rb": ("def pick(items)\n  n = 5\n  n\nend\n", "x = pick(items)\n"),
+}
+
+
+class ExploreLanguageCase(CrucibleCase):
+    def language_root(self, ext, source, caller):
+        ext = ext.split("-")[0]
+        repo = self.make_repo({f"svc.{ext}": source, f"use.{ext}": caller})
+        git(repo, "init", "-q")
+        git(repo, "add", "--", f"svc.{ext}", f"use.{ext}")
+        git(repo, "commit", "-q", "-m", "feat: add pick")
+        with open(os.path.join(repo, f"svc.{ext}"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(source.replace("5", "10"))
+        git(repo, "commit", "-q", "-am", "fix: raise the pick limit")
+        root = os.path.join(self.tmp(), "audit")
+        self.assertEqual(run(root, "init", "--repo", repo)[0], 0)
+        return root
+
+    def test_explore_finds_callers_and_history_per_language(self):
+        for key, (source, caller) in LANGUAGES.items():
+            with self.subTest(language=key):
+                ext = key.split("-")[0]
+                root = self.language_root(key, source, caller)
+                body = next(i for i, text in enumerate(source.splitlines(), 1) if "10" in text.replace("5", "10") and "5" in text)
+                code, out, err = run(root, "explore", f"svc.{ext}:{body}")
+                self.assertEqual(code, 0, err)
+                self.assertIn("symbol: " + ("Pick" if ext == "cs" else "pick") + " (", out)
+                self.assertIn(f"use.{ext}:", out)
+                callers = out.split("callers:")[1].split("callees:")[0]
+                self.assertIn(f"use.{ext}:", callers)
+                self.assertIn("feat: add pick", out)
+                fixes = out.split("earlier fix or revert on these lines:")[1].split("siblings:")[0]
+                self.assertIn("fix: raise the pick limit", fixes)
+
+    def test_explore_says_when_the_extension_has_no_symbol_detection(self):
+        repo = self.make_repo({"calc.lua": "function pick(items)\n  return 5\nend\n", "use.lua": "local x = pick(items)\n"})
+        root = os.path.join(self.tmp(), "audit")
+        self.assertEqual(run(root, "init", "--repo", repo)[0], 0)
+        code, out, err = run(root, "explore", "calc.lua:2")
+        self.assertEqual(code, 0, err)
+        self.assertIn("symbol detection not supported for .lua: callers not listed", out)
+        self.assertNotIn("callers: none found by search", out)
