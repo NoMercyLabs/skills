@@ -38,6 +38,8 @@ One plugin carries every skill, namespaced as `/nomercylabs:atlas` and `/nomercy
 /plugin install nomercylabs@nomercylabs
 ```
 
+The same marketplace also lists `grimoira` (a per-project knowledge store): `/plugin install grimoira@nomercylabs`.
+
 ### By hand
 
 ```bash
