@@ -109,6 +109,21 @@ class HealTests(CrucibleCase):
         out = heal.recover(self.root, "other-u04", failed(truncated=True, output="disk quota exceeded"), runner)
         self.assertEqual((out["result"], runner.calls), ("reported", []))
 
+    def test_failure_record_written_when_unit_fails(self):
+        heal.recover(self.root, UNIT, failed(truncated=True), Runner(ok=False))
+        heal.recover(self.root, "other-u01", failed(output="disk quota exceeded"), Runner())
+        heal.recover(self.root, "other-u02", failed(exit_code=0, output="done"), Runner())
+        heal.recover(self.root, "other-u03", failed(refusal="gate"), Runner())
+        heal.recover(self.root, "other-u04", {"exit_code": 0, "output": "ok", "schema_ok": True}, Runner())
+        rows = read_json(os.path.join(self.path, "failures.json"))
+        self.assertEqual([(r["class"], r["unit"]) for r in rows],
+                         [("context_exhausted", UNIT), ("unknown", "other-u01"), ("schema_missing", "other-u02")])
+        self.assertEqual(rows[1]["signature"], "disk quota exceeded")
+        self.assertTrue(all(r["at"] for r in rows))
+        found = {(r["kind"], r["signature"]) for r in lessons.occurrences(self.root)}
+        self.assertIn(("unit_size", "context_exhausted"), found)
+        self.assertIn(("failure_signature", "disk quota exceeded"), found)
+
     def test_recovery_max_two_tries_then_blocked(self):
         runner = Runner(ok=False)
         facts = failed(exit_code=0, output="done")
