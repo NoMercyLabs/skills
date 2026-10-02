@@ -284,6 +284,23 @@ class FixBranchTests(BlockerCase):
         self.assertEqual(git(self.repo, "show", "crucible/audit-fixes:lib.py"), "FIXED")
         self.assertEqual(git(self.repo, "show", "crucible/fix-b-002:lib.py"), "FIXED-B")
 
+    def test_failed_proof_rerun_starts_clean(self):
+        self.allow(landing="local_branch")
+        blocker = self.planned(proof=f'{PY} -c "import sys; sys.exit(1)"')
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "failed")
+        self.assertEqual(git(self.repo, "rev-parse", "--abbrev-ref", "HEAD"), self.base)
+        self.assertIn("broken", self.lib_text())
+        self.assertEqual(git(self.repo, "status", "--porcelain"), "")
+        self.assertEqual(git(self.repo, "branch", "--list", self.BRANCH), "")
+        code, out, err = run(self.root, *self.plan_args(blocker))
+        self.assertEqual(code, 0, out + err)
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "fixed")
+        self.assertEqual(git(self.repo, "show", f"{self.BRANCH}:lib.py"), "FIXED")
+
 
 class FixPlanRefusalTests(BlockerCase):
     def refused(self, text, **over):
@@ -316,6 +333,16 @@ class FixPlanRefusalTests(BlockerCase):
                     self.assertIn(command.split()[0], err)
                     self.assertIn("you run it yourself", err)
                     self.assertFalse(os.path.exists(os.path.join(self.root, "fixes", blocker + ".json")))
+
+    def test_push_branch_without_branch_refused_at_plan(self):
+        self.allow(landing="push_branch")
+        blocker = self.add()
+        code, out, err = run(self.root, *self.plan_args(blocker))
+        self.assertEqual(code, 1, out)
+        self.assertIn("branch", err)
+        self.assertIn("push_branch", err)
+        self.assertFalse(os.path.exists(os.path.join(self.root, "fixes", blocker + ".json")))
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "open")
 
     def test_fix_touching_must_not_change_refused_at_plan(self):
         run(self.root, "brief", "answer", "must_never_change", "--words", "lib.py stays as it is")
