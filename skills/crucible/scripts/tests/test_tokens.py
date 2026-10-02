@@ -223,6 +223,31 @@ class TokenTests(CrucibleCase):
         self.assertEqual(code, 0, err)
         self.assertTrue(os.path.exists(out_file))
 
+    def test_pilot_forecast_includes_measured_verifier(self):
+        root, units = self.setup_audit()
+        for unit in units[:3]:
+            self.assertEqual(self.record(root, unit)[0], 0)
+        measured = 0
+        for unit, candidates in zip(units[:3], (2, 4, 6)):
+            total = 60000 + 50000 * candidates
+            measured += total
+            path = make_transcript(os.path.join(self.tmp(), f"v-{unit['unit']}.jsonl"), 2, total, 500)
+            code, out, err = run(root, "calibrate", "--role", "verifier", "--unit", unit["unit"],
+                                 "--candidates", str(candidates), "--transcript", path)
+            self.assertEqual(code, 0, err)
+        self.assertIn("refit after 3 units", out)
+        plan = plan_for(Root(root))
+        with open(os.path.join(root, "calibration.json"), encoding="utf-8") as fh:
+            fitted = json.load(fh)["tiers"][plan["roles"]["verifier"]["tier"]]
+        self.assertEqual(fitted["verifier_samples"], 3)
+        self.assertAlmostEqual(fitted["verifier_tokens_per_candidate"], 50000, delta=1)
+        with open(os.path.join(root, "tokens.json"), encoding="utf-8") as fh:
+            stages = {f["stage"]: f for f in json.load(fh)["forecasts"]}
+        self.assertEqual(sorted(stages), ["pilot"])
+        verifier = stages["pilot"]["parts"]["verifier"]
+        self.assertEqual(verifier, measured + tokens.verifier_tokens(fitted))
+        self.assertNotEqual(tokens.verifier_tokens(fitted), tokens.verifier_tokens(tokens.DEFAULT_TERMS))
+
     def test_forecast_over_cap_stops(self):
         tiny = {"budget": {"max_tokens": 1000, "tokens_per_line": 34}}
         root, units = self.setup_audit(config=tiny)
