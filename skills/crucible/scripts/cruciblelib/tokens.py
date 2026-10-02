@@ -114,6 +114,12 @@ def fit_terms(tiers, records):
     return out
 
 
+def reader_factor(plan, terms):
+    """Terms fitted from measured reader usage already hold what a forecast_factor lesson corrects; scaling them
+    again would double it."""
+    return 1 if terms.get("samples") else plan.get("forecast_factor", 1)
+
+
 def project(plan, tiers, records):
     """Per role: tokens already spent (from records), tokens still to come (formula), and the margin on those."""
     done = {(r["role"], r.get("unit")): r for r in records}
@@ -124,7 +130,7 @@ def project(plan, tiers, records):
     def add(role, tier, spent, estimate):
         part = parts[role]
         if spent is None:
-            estimate = round(estimate * factor)
+            estimate = round(estimate * (reader_factor(plan, tiers[tier]) if role == "reader" else factor))
             part["left"] += estimate
             part["margin"] += estimate * tiers[tier]["spread"]
         else:
@@ -187,7 +193,8 @@ def ensure_first_estimate(root, plan, tiers, ledger):
     if "first_estimate" not in ledger:
         parts = project(plan, tiers, [])
         ledger["first_estimate"] = {"parts": {role: p["total"] for role, p in parts.items()},
-                                    "units": {u["unit"]: round(reader_tokens(tiers[u["reader_tier"]], u["lines"]) * plan.get("forecast_factor", 1))
+                                    "units": {u["unit"]: round(reader_tokens(tiers[u["reader_tier"]], u["lines"])
+                                                    * reader_factor(plan, tiers[u["reader_tier"]]))
                                               for u in plan["units"]}}
         write_json(ledger_path(root), ledger)
 
@@ -284,13 +291,14 @@ def cmd_calibrate(args):
 
 def print_estimate(plan, tiers):
     readers = [(tiers[u["reader_tier"]], u["lines"]) for u in plan["units"]]
-    factor = plan.get("forecast_factor", 1)
-    parts = [reader_parts(terms, lines) for terms, lines in readers]
-    total = round(sum(reader_tokens(terms, lines) for terms, lines in readers) * factor)
-    print(f"reader tokens: {total} (start cost {round(sum(p['start'] for p in parts) * factor)}, "
-          f"lines {round(sum(p['lines'] for p in parts) * factor)}, "
-          f"turns {round(sum(p['turn_tokens'] for p in parts) * factor)} over {sum(p['turns'] for p in parts)} turns, "
-          f"output {round(sum(p['output'] for p in parts) * factor)})")
+    parts = [(reader_parts(terms, lines), reader_factor(plan, terms)) for terms, lines in readers]
+
+    def scaled(key):
+        return round(sum(p[key] * f for p, f in parts))
+    total = round(sum(reader_tokens(terms, lines) * reader_factor(plan, terms) for terms, lines in readers))
+    print(f"reader tokens: {total} (start cost {scaled('start')}, lines {scaled('lines')}, "
+          f"turns {scaled('turn_tokens')} over {sum(p['turns'] for p, f in parts)} turns, "
+          f"output {scaled('output')})")
     estimate = project(plan, tiers, [])
     print(f"verifier tokens: {estimate['verifier']['total']} (start cost plus tokens per candidate)")
     print(f"judgment tokens: {estimate['judge']['total']}")
