@@ -18,7 +18,7 @@ BLOB_MODULES = {"base64", "binascii", "marshal", "pickle", "zlib", "codecs"}
 # Only these files may reach the network or start a process; each is a documented adapter (SECURITY.md).
 NETWORK_ALLOWED = ("cruciblelib/trackers/", "cruciblelib/knowledge")
 SUBPROCESS_ALLOWED = ("cruciblelib/config.py", "cruciblelib/safety.py", "cruciblelib/trackers/github.py",
-                      "cruciblelib/knowledge", "cruciblelib/system.py")
+                      "cruciblelib/knowledge", "cruciblelib/clones.py")
 CREDENTIAL_PATHS = re.compile(
     r"\.ssh\b|\.aws\b|\.gnupg|\.azure\b|\.kube\b|\.netrc|\.git-credentials|\.pypirc|\.npmrc"
     r"|\.docker[/\\]config|\.config[/\\]gcloud|keychains?\b|login data|bash_history|zsh_history"
@@ -158,6 +158,11 @@ class PlantedViolations(unittest.TestCase):
     def test_a_subprocess_outside_the_adapters_is_refused(self):
         self.assertEqual(self.rules("import subprocess\nsubprocess.run(['ls'])\n", "cruciblelib/inventory.py"),
                          {"subprocess-location"})
+
+    def test_git_clone_is_allowed_only_in_the_clones_adapter(self):
+        call = "import subprocess\nsubprocess.run(['git', 'clone', 'a', 'b'])\n"
+        self.assertEqual(self.scan(call, "cruciblelib/clones.py"), [])
+        self.assertEqual(self.rules(call, "cruciblelib/system.py"), {"subprocess-location"})
 
     def test_a_subprocess_call_needs_an_argument_list(self):
         self.assertEqual(self.rules("import subprocess\nsubprocess.run('ls -l')\n", "cruciblelib/config.py"),

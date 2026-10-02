@@ -305,6 +305,24 @@ GRAPH_FILES = {
 }
 
 
+class CloneAdapterTests(SystemCase):
+    def test_clone_refuses_without_grant(self):
+        from cruciblelib import clones
+        from cruciblelib.common import Root, CrucibleError
+        source = self.git_repo({"app.py": "x = 1\n"})
+        root = self.init_root(source)
+        dest = os.path.join(self.tmp(), "base", "svc")
+        rows = [{"name": "svc", "source": source, "dest": dest}]
+        seen = []
+        with mock.patch.object(clones.subprocess, "run", side_effect=AssertionError("git ran")) as spy:
+            with self.assertRaises(CrucibleError) as ctx:
+                clones.clone_repos(Root(root), rows, os.path.dirname(dest), seen.append)
+        self.assertIn("workspace_clones", str(ctx.exception))
+        spy.assert_not_called()
+        self.assertEqual(seen, [])
+        self.assertFalse(os.path.exists(os.path.dirname(dest)))
+
+
 class GraphTests(SystemCase):
     def system(self):
         org = self.tmp()

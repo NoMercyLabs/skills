@@ -8,12 +8,11 @@ import os
 import re
 import shutil
 import stat
-import subprocess
 
 from .common import CrucibleError, Root, is_secret_file, mask_secrets, read_json, split_lines, write_json
+from . import clones
 from .config import detect_repo, git, remote_owner, unique_names
 from .inventory import ALWAYS_SKIP, walk_text_files
-from .permissions import run_action
 from .trackers import github as gh_adapter
 
 LAYOUTS = ("single", "monorepo", "multi-repo")
@@ -376,12 +375,7 @@ def dir_size(path):
 def source_branch(source):
     if os.path.isdir(source):
         return git(source, "symbolic-ref", "--short", "HEAD") or "detached"
-    try:
-        done = subprocess.run(["git", "ls-remote", "--symref", source, "HEAD"], capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.SubprocessError):
-        return "unknown"
-    match = re.search(r"ref: refs/heads/(\S+)\s+HEAD", done.stdout)
-    return match.group(1) if match else "unknown"
+    return clones.ls_remote_branch(source)
 
 
 def check_base(base, user_paths):
@@ -508,21 +502,9 @@ def cmd_ws_choose(args):
               "uncommitted work stays as it is")
 
 
-def clone_all(rows):
-    done = []
-    for row in rows:
-        if os.path.exists(row["dest"]):
-            raise CrucibleError(f"refused: {row['dest']} exists")
-    os.makedirs(os.path.dirname(rows[0]["dest"]), exist_ok=True)
-    for row in rows:
-        out = subprocess.run(["git", "clone", "--quiet", "--no-hardlinks", "--", row["source"], row["dest"]],
-                             capture_output=True, text=True, timeout=1800)
-        if out.returncode != 0:
-            raise CrucibleError(f"git clone of {row['source']} failed: {out.stderr.strip()}")
-        read_only(row["dest"])
-        row["commit"] = git(row["dest"], "rev-parse", "HEAD")
-        done.append(row["name"])
-    return ", ".join(done)
+def finish_clone(row):
+    read_only(row["dest"])
+    row["commit"] = git(row["dest"], "rev-parse", "HEAD")
 
 
 def cmd_ws_clone(args):
@@ -537,9 +519,7 @@ def cmd_ws_clone(args):
     user_paths = [r["path"] for r in cfg["repos"]] + [s for s in sources if os.path.isdir(s)]
     check_base(base, user_paths)
     rows = clone_plan(cfg, base, sources)
-    # the grant is checked before any folder exists
-    run_action(root, "workspace_clones", f"clone {len(rows)} repos into {base}", lambda: clone_all(rows),
-               repos=[r["name"] for r in rows])
+    clones.clone_repos(root, rows, base, finish_clone)
     by_source = {norm(r["path"]): r for r in cfg["repos"] if os.path.isdir(r["path"])}
     for row in rows:
         old = by_source.get(norm(row["source"])) if os.path.isdir(row["source"]) else None
