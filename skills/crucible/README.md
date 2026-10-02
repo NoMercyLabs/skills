@@ -15,6 +15,16 @@ The skill an agent loads when asked to audit a whole system: every repo, every f
 
 Two things run beside the pipeline. A **blocker** (a missing tool, a failing command, a tracker without a field or label, a token without a scope) can be fixed with your permission: `crucible blocker`, `crucible fix`; a backup comes first and the blocked stage must pass again. Product findings are filed, never fixed. **Knowledge** from outside this machine (issues, docs sites, wikis, exports) can be fetched read-only with `crucible knowledge fetch` and absorbed into permanent memory. Backups of anything that can be lost are on by default.
 
+## What it looks like
+
+![A project board of filed findings, grouped by repository](docs/mockups/board.svg)
+
+The data is made up. `crucible file --apply` creates each issue and adds it to the board; it creates no columns or fields, so this view is grouped by repository.
+
+![One filed issue, with its root cause chain and "Do not fix by" section](docs/mockups/issue.svg)
+
+The data is made up. `crucible file --apply` writes this body from the accepted finding; an exploitable finding gets only the pointer shown at the bottom on a public repo.
+
 ## The engine
 
 ```sh

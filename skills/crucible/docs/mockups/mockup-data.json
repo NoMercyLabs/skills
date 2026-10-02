@@ -1,0 +1,73 @@
+{
+ "_note": "Made-up data for the README mockups. Section names and the pointer text are checked against scripts/cruciblelib/filing.py by build.py.",
+ "project": "acme-shop audit",
+ "view": "Findings, grouped by Repository",
+ "columns": [
+  {"repo": "acme-web", "cards": [
+   {"number": 14, "title": "Cart badge count is not reset after checkout completes", "labels": ["type/bug", "area/cart"]},
+   {"number": 15, "title": "Product list refetches on every filter keystroke", "labels": ["type/bug", "area/search"]},
+   {"number": 17, "title": "Order history page has no error state when the request fails", "labels": ["type/bug", "area/orders"]},
+   {"number": 18, "title": "Image gallery keyboard focus is lost after closing the zoom view", "labels": ["type/bug", "area/gallery"]}
+  ]},
+  {"repo": "acme-api", "cards": [
+   {"number": 57, "title": "Partial refunds ignore the order discount", "labels": ["type/bug", "area/billing"]},
+   {"number": 58, "title": "Order list query has no index on created_at", "labels": ["type/bug", "area/orders"]},
+   {"number": 61, "title": "Webhook retries run without a maximum attempt count", "labels": ["type/bug", "area/webhooks"]},
+   {"number": 63, "title": "Stock reservation is not released when a cart expires", "labels": ["type/bug", "area/inventory"]},
+   {"number": 64, "title": "Pagination returns a duplicate row at page boundaries", "labels": ["type/bug", "area/orders"]}
+  ]},
+  {"repo": "acme-mobile", "cards": [
+   {"number": 9, "title": "Saved addresses list is empty after an app update", "labels": ["type/bug", "area/profile"]},
+   {"number": 11, "title": "Push opt-in prompt appears on every launch", "labels": ["type/bug", "area/notifications"]},
+   {"number": 12, "title": "Offline cart changes are dropped when the network returns", "labels": ["type/bug", "area/cart"]}
+  ]},
+  {"repo": "acme-worker", "cards": [
+   {"number": 21, "title": "Nightly export job skips orders created after midnight UTC", "labels": ["type/bug", "area/exports"]},
+   {"number": 22, "title": "Failed jobs are logged without the job id", "labels": ["type/bug", "area/logging"]},
+   {"number": 24, "title": "Two workers can pick up the same queued email", "labels": ["type/bug", "area/queue"]}
+  ]}
+ ],
+ "issue": {
+  "repo": "acme-api",
+  "number": 57,
+  "title": "Partial refunds ignore the order discount",
+  "labels": ["type/bug", "area/billing"],
+  "project": "acme-shop audit",
+  "sections": [
+   {"name": "Summary", "text": ["A partial refund recomputes the amount without the order's discount."]},
+   {"name": "Observed", "text": ["Refunding 1 of 3 items on an order with a 10 percent discount returns the full item price."]},
+   {"name": "Expected", "text": ["The refund equals the item price minus that item's share of the discount."]},
+   {"name": "Where", "list": ["file: src/billing/refund.py", "file: src/billing/totals.py"]},
+   {"name": "When", "text": ["any partial refund on a discounted order (always)"]},
+   {"name": "Cause", "text": ["The refund path reads unit_price from the line item and never calls the discount allocator. (verified)"]},
+   {"name": "Root cause", "text": [
+     "Symptom: the refund amount is too high (`src/billing/refund.py:88`)",
+     "1. `src/billing/refund.py:74`: refund_amount() sums unit_price for the chosen lines.",
+     "2. `src/billing/totals.py:31`: allocate_discount() is called only from order_total().",
+     "Root cause: `src/billing/totals.py:19`: discount shares are computed at checkout and never stored on the line item.",
+     "(re-opened by the verifier)"]},
+   {"name": "Do not fix by", "list": [
+     "capping the refund at the order total, which hides the wrong amount",
+     "rounding the refund down",
+     "catching the over-refund error in the payment call"]},
+   {"name": "Reproduce", "numbered": [
+     "Create an order of 3 items with a 10 percent discount code.",
+     "Refund one item through POST /refunds.",
+     "Compare the refund amount with the item price."]},
+   {"name": "Fix", "text": ["Store the discount share on each line item at checkout and subtract it in refund_amount()."]},
+   {"name": "Prove", "text": ["A test that refunds one discounted item fails on the unchanged code and passes after the fix."]},
+   {"name": "Evidence", "list": [
+     "`src/billing/refund.py:74`: return sum(line.unit_price for line in lines)",
+     "`src/billing/totals.py:19`: share = discount * line.unit_price / subtotal"]},
+   {"name": "Siblings", "list": ["src/billing/credit_note.py:52"]},
+   {"name": "Not checked", "list": ["the payment provider's partial-capture limits"]},
+   {"name": "Affected", "text": ["customers who return part of a discounted order; owner: acme-api, billing"]},
+   {"name": "Severity", "text": ["medium, size S"]}
+  ],
+  "pointer_repo": "acme-web"
+ },
+ "captions": {
+  "board": "Made-up data. Produced by `crucible file --apply`: it creates the issues, then adds each one to the board.",
+  "issue": "Made-up data. Produced by `crucible file --apply`: the issue body is the finding as `crucible accept` stored it."
+ }
+}
