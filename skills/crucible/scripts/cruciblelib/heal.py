@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from . import blockers, lessons, split
 from .common import CrucibleError, read_json, write_json
 from .permissions import log_action, now
+from .repeats import shape_of
 
 GROUP = "heal"
 MAX_TRIES = 2
@@ -53,6 +54,13 @@ def record(root, cls, unit, tries, result, detail=""):
     return {"class": cls, "unit": unit, "try": tries, "result": result}
 
 
+def record_unit_failure(root, cls, unit, facts):
+    """One row per failed unit in failures.json, the file learn reads to size units and match failure signatures."""
+    signature = shape_of(facts.get("output") or "")[:200] if cls == "unknown" else cls
+    rows = read_json(root.p("failures.json"), []) or []
+    write_json(root.p("failures.json"), rows + [{"class": cls, "unit": unit, "signature": signature or cls, "at": now()}])
+
+
 def tries_used(root, cls, unit):
     return sum(1 for r in load(root) if r["class"] == cls and r["unit"] == unit and r["result"] in
                ("healed", "failed", "blocked") and r["try"])
@@ -93,6 +101,7 @@ def recover(root, unit, facts, runner):
         return record(root, cls, unit, 0, "refused", f"{facts.get('refusal')} refusal is never healed")
     if cls == "none":
         return {"class": cls, "unit": unit, "try": 0, "result": "none"}
+    record_unit_failure(root, cls, unit, facts)
     if cls == "tracker_scope":
         return {**record(root, cls, unit, 0, "stopped", SCOPE_HINT), "hint": SCOPE_HINT}
     action = lessons.recovery_for(root, facts.get("output"))
