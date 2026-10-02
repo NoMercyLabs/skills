@@ -4,7 +4,7 @@ import math
 import os
 import shutil
 
-from .common import CrucibleError, Root, numbered, read_json, split_lines, stamp, write_json
+from .common import CrucibleError, Root, is_secret_file, numbered, read_json, split_lines, stamp, write_json
 
 DEFAULT_UNIT_BYTES = 92160
 # Measured on real runs: a reader costs about 29 tokens per line, the verifier adds about 15% of that.
@@ -40,7 +40,7 @@ def walk_text_files(repo_path, skip=(), include=()):
         for name in names:
             rel = (rel_folder + "/" + name).lstrip("/")
             full = os.path.join(folder, name)
-            if name.startswith(("EXPECTED", "NOTES")) or os.path.islink(full) or is_skipped(rel, skip):
+            if name.startswith(("EXPECTED", "NOTES")) or is_secret_file(name) or os.path.islink(full) or is_skipped(rel, skip):
                 continue
             if include and not any(rel == i.rstrip("/") or rel.startswith(i.rstrip("/") + "/") for i in include):
                 continue

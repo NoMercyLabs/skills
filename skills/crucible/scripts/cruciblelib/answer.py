@@ -10,6 +10,11 @@ CONFIG_KEYS = ("scope", "goals", "stages", "tracker", "auto_file", "advisories",
 # A group shares its name with a config key (live_checks, blocker_fixes, knowledge_sources), so groups carry a prefix.
 INTERVIEW_ORDER = CONFIG_KEYS + tuple(PREFIX + group for group in GROUPS)
 
+# A policy answer is the user's decision about their own system or risk: it carries their words.
+# Plain facts (scope, goals, stages, tracker, advisories, owners, privacy words, budget) may go without.
+POLICY_KEYS = ("auto_file", "blocker_fixes", "memory", "live_checks", "backups", "knowledge_sources", "models",
+               "visibility", "private_destination")
+
 CHOICES = {
     "blocker_fixes.mode": ("each", "within_limits", "never"),
     "blocker_fixes.landing": ("pr", "local_branch", "push_branch"),
@@ -50,6 +55,9 @@ def check_value(key, value):
         raise CrucibleError("auto_file is true or false")
     if key in CHOICES and value not in CHOICES[key]:
         raise CrucibleError(f"{key} is one of: {', '.join(CHOICES[key])}")
+    if key in ("blocker_fixes", "memory") and not isinstance(value, dict):
+        raise CrucibleError(f"{key} is an object, for example "
+                            + ('{"mode": "each"}' if key == "blocker_fixes" else '{"kind": "none"}'))
     if key in ("blocker_fixes", "memory") and isinstance(value, dict):
         for name, inner in value.items():
             if f"{key}.{name}" in CHOICES and inner not in CHOICES[f"{key}.{name}"]:
@@ -63,6 +71,9 @@ def set_answer(root, key, value, words=""):
         raise CrucibleError(f"{key}: permission groups are answered with `crucible grant GROUP yes|no`")
     if top not in CONFIG_KEYS:
         raise CrucibleError(f"unknown key {top!r}: use one of {', '.join(CONFIG_KEYS)}")
+    if top in POLICY_KEYS and not (words or "").strip():
+        raise CrucibleError(f"refused: {top} is the user's decision: ask the user, then record their own words "
+                            f"with --words")
     check_value(key, value)
     cfg = root.config()
     node = cfg

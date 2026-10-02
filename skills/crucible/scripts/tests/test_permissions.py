@@ -2,8 +2,8 @@ import json
 import os
 
 from cruciblelib.common import CrucibleError, Root, mask_secrets
-from cruciblelib.permissions import (GROUPS, authorize, grant, log_action, parse_bounds, require_approved,
-                                     run_action)
+from cruciblelib.permissions import (GROUPS, authorize, grant, log_action, parse_bounds, record_dryrun,
+                                     require_approved, run_action)
 
 from .helpers import CrucibleCase, run
 
@@ -15,8 +15,8 @@ class PermissionCase(CrucibleCase):
         """A confirmed root; grants maps group -> list of --bound items for a yes, every other group is a no."""
         grants = grants or {}
         root, repo = self.make_root(FILES, confirm=False)
-        self.assertEqual(run(root, "answer", "auto_file", auto_file)[0], 0)
-        self.assertEqual(run(root, "answer", "blocker_fixes", '{"mode": "never"}')[0], 0)
+        self.assertEqual(run(root, "answer", "auto_file", auto_file, "--words", "test")[0], 0)
+        self.assertEqual(run(root, "answer", "blocker_fixes", '{"mode": "never"}', "--words", "test")[0], 0)
         for group in GROUPS:
             if group in grants:
                 bounds = [x for item in grants[group] for x in ("--bound", item)]
@@ -42,15 +42,15 @@ class PermissionCase(CrucibleCase):
 class ConfirmGateTests(PermissionCase):
     def test_confirm_needs_every_grant(self):
         root, repo = self.make_root(FILES, confirm=False)
-        self.assertEqual(run(root, "answer", "auto_file", "false")[0], 0)
-        self.assertEqual(run(root, "answer", "blocker_fixes", '{"mode": "never"}')[0], 0)
+        self.assertEqual(run(root, "answer", "auto_file", "false", "--words", "test")[0], 0)
+        self.assertEqual(run(root, "answer", "blocker_fixes", '{"mode": "never"}', "--words", "test")[0], 0)
         for group in GROUPS[:-1]:
-            self.assertEqual(run(root, "grant", group, "no")[0], 0)
+            self.assertEqual(run(root, "grant", group, "no", "--words", "test")[0], 0)
         code, out, err = run(root, "confirm")
         self.assertEqual(code, 1)
         self.assertIn("missing: permissions.knowledge_sources", err)
         self.assertNotIn("permissions.local_reads", err)
-        self.assertEqual(run(root, "grant", GROUPS[-1], "no")[0], 0)
+        self.assertEqual(run(root, "grant", GROUPS[-1], "no", "--words", "test")[0], 0)
         self.assertEqual(run(root, "confirm")[0], 0, err)
 
     def test_confirm_lists_every_missing_answer(self):
@@ -62,18 +62,18 @@ class ConfirmGateTests(PermissionCase):
 
     def test_confirm_refuses_without_auto_file(self):
         root, repo = self.make_root(FILES, confirm=False)
-        self.assertEqual(run(root, "answer", "blocker_fixes", '{"mode": "each"}')[0], 0)
+        self.assertEqual(run(root, "answer", "blocker_fixes", '{"mode": "each"}', "--words", "test")[0], 0)
         for group in GROUPS:
-            run(root, "grant", group, "no")
+            run(root, "grant", group, "no", "--words", "test")
         code, out, err = run(root, "confirm")
         self.assertEqual(code, 1)
         self.assertIn("missing: auto_file", err)
 
     def test_confirm_refuses_while_blocker_fix_mode_is_unset(self):
         root, repo = self.make_root(FILES, confirm=False)
-        self.assertEqual(run(root, "answer", "auto_file", "true")[0], 0)
+        self.assertEqual(run(root, "answer", "auto_file", "true", "--words", "test")[0], 0)
         for group in GROUPS:
-            run(root, "grant", group, "no")
+            run(root, "grant", group, "no", "--words", "test")
         code, out, err = run(root, "confirm")
         self.assertEqual(code, 1)
         self.assertIn("missing: blocker_fixes", err)
@@ -149,7 +149,7 @@ class GrantTests(PermissionCase):
     def test_denied_grant_never_asked_again(self):
         root, repo = self.make_root(FILES, confirm=False)
         self.assertEqual(run(root, "grant", "tracker_issues", "no", "--words", "not now")[0], 0)
-        code, out, err = run(root, "grant", "tracker_issues", "yes")
+        code, out, err = run(root, "grant", "tracker_issues", "yes", "--words", "test")
         self.assertEqual(code, 1)
         self.assertIn("a no is final", err)
         code, out, err = run(root, "grant", "tracker_issues", "yes", "--reopen")
@@ -161,18 +161,19 @@ class GrantTests(PermissionCase):
 
     def test_a_denied_group_is_skipped_by_next(self):
         root, repo = self.make_root(FILES, confirm=False)
-        run(root, "grant", "local_reads", "no")
+        run(root, "grant", "local_reads", "no", "--words", "test")
         for key in ("scope", "goals", "stages", "tracker", "auto_file", "advisories", "owners",
                     "privacy_words", "budget", "models", "live_checks", "blocker_fixes", "backups",
                     "memory", "knowledge_sources"):
             run(root, "answer", key, "{}" if key not in ("auto_file", "blocker_fixes", "memory") else
-                {"auto_file": "false", "blocker_fixes": '{"mode": "never"}', "memory": '{"kind": "none"}'}[key])
+                {"auto_file": "false", "blocker_fixes": '{"mode": "never"}', "memory": '{"kind": "none"}'}[key],
+                "--words", "test")
         code, out, err = run(root, "next")
         self.assertEqual(out.strip(), "permissions.agent_runs")
 
     def test_reopen_with_the_users_words_is_allowed_and_recorded(self):
         root, repo = self.make_root(FILES, confirm=False)
-        run(root, "grant", "installs", "no")
+        run(root, "grant", "installs", "no", "--words", "test")
         code, out, err = run(root, "grant", "installs", "yes", "--reopen", "--words", "I changed my mind")
         self.assertEqual(code, 0, err)
         with open(os.path.join(root, "config.json"), encoding="utf-8") as fh:
@@ -181,8 +182,8 @@ class GrantTests(PermissionCase):
 
     def test_a_yes_can_be_withdrawn(self):
         root, repo = self.make_root(FILES, confirm=False)
-        run(root, "grant", "installs", "yes")
-        self.assertEqual(run(root, "grant", "installs", "no")[0], 0)
+        run(root, "grant", "installs", "yes", "--words", "test")
+        self.assertEqual(run(root, "grant", "installs", "no", "--words", "test")[0], 0)
 
     def test_grant_records_words_bounds_and_time(self):
         root, repo = self.make_root(FILES, confirm=False)
@@ -219,12 +220,14 @@ class GrantTests(PermissionCase):
 class ApproveTests(PermissionCase):
     def test_apply_needs_approved_plan_hash(self):
         root = self.granted(auto_file="false")
+        record_dryrun(Root(root), "abc12345")
         self.refused(lambda: require_approved(Root(root), "abc12345"), "not approved", "crucible approve abc12345")
         self.assertEqual(run(root, "approve", "abc12345")[0], 0)
         require_approved(Root(root), "abc12345")
 
     def test_apply_with_a_wrong_hash_is_refused(self):
         root = self.granted(auto_file="false")
+        record_dryrun(Root(root), "abc12345")
         self.assertEqual(run(root, "approve", "abc12345")[0], 0)
         self.refused(lambda: require_approved(Root(root), "ffff0000"), "not approved")
         self.assertEqual(self.log_rows(root)[-1]["status"], "refused")
@@ -241,6 +244,7 @@ class ApproveTests(PermissionCase):
 
     def test_approving_twice_keeps_one_row(self):
         root = self.granted()
+        record_dryrun(Root(root), "abc12345")
         run(root, "approve", "abc12345")
         run(root, "approve", "abc12345")
         with open(os.path.join(root, "approvals.json"), encoding="utf-8") as fh:
@@ -248,8 +252,19 @@ class ApproveTests(PermissionCase):
 
     def test_a_changed_plan_needs_a_new_approval(self):
         root = self.granted()
+        record_dryrun(Root(root), "abc12345")
         run(root, "approve", "abc12345")
         self.refused(lambda: require_approved(Root(root), "abc12346"))
+
+    def test_approve_unknown_hash_refused(self):
+        root = self.granted(auto_file="false")
+        code, out, err = run(root, "approve", "abc12345")
+        self.assertEqual(code, 1)
+        self.assertIn("no `file --dry-run` produced plan abc12345", err)
+        self.assertFalse(os.path.exists(os.path.join(root, "approvals.json")))
+        self.refused(lambda: require_approved(Root(root), "abc12345"), "not approved")
+        record_dryrun(Root(root), "abc12345")
+        self.assertEqual(run(root, "approve", "abc12345")[0], 0)
 
 
 class ActionLogTests(PermissionCase):

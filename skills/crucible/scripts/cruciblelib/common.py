@@ -49,6 +49,15 @@ class CrucibleError(Exception):
     pass
 
 
+ENV_TEMPLATES = (".env.example", ".env.sample", ".env.template", ".env.dist")
+
+
+def is_secret_file(path):
+    """True for .env and every .env.* except the four template names; such a file is never opened."""
+    name = str(path).replace("\\", "/").rsplit("/", 1)[-1].lower()
+    return (name == ".env" or name.startswith(".env.")) and name not in ENV_TEMPLATES
+
+
 def read_json(path, default=None):
     if not os.path.exists(path):
         return default

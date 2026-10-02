@@ -45,7 +45,7 @@ class CrucibleCase(unittest.TestCase):
         self.assertEqual(code, 0, err)
         config = dict(config or {})
         if memory and "memory" not in config:
-            self.assertEqual(run(root, "memory", "none")[0], 0)
+            self.assertEqual(run(root, "memory", "none", "--words", "test default")[0], 0)
         if config:
             path = os.path.join(root, "config.json")
             with open(path, encoding="utf-8") as fh:
@@ -62,7 +62,7 @@ class CrucibleCase(unittest.TestCase):
     def answer_everything(self, root):
         """Answer the questions confirm needs, through the CLI, the way the interview does."""
         for command in (["answer", "auto_file", "false"], ["answer", "blocker_fixes", '{"mode": "never"}']):
-            code, out, err = run(root, *command)
+            code, out, err = run(root, *command, "--words", "test default")
             self.assertEqual(code, 0, err)
         for group in GROUPS:
             code, out, err = run(root, "grant", group, "no", "--words", "test default")

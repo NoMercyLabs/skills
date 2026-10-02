@@ -166,6 +166,9 @@ def grant(root, group, answer, words="", bounds=None, reopen=False):
         raise CrucibleError(f"unknown permission group {group!r}: use one of {', '.join(GROUPS)}")
     if answer not in ("yes", "no"):
         raise CrucibleError("the answer is yes or no")
+    if not (words or "").strip():
+        raise CrucibleError(f"refused: a grant records the user's own words: ask the user, then pass them with "
+                            f"--words (for example `crucible grant {group} {answer} --words \"<their words>\"`)")
     cfg = root.config()
     permissions = cfg.setdefault("permissions", {})
     before = permissions.get(group)
@@ -188,9 +191,24 @@ def require_approved(root, plan_hash):
                f"{plan_hash}`")
 
 
+def record_dryrun(root, plan_hash, plan=None):
+    """Remember a plan hash that `file --dry-run` produced; only such a hash can be approved or applied."""
+    rows = read_json(root.p("dryruns.json"), [])
+    if plan_hash not in [row["hash"] for row in rows]:
+        rows.append({"hash": plan_hash, "at": now(), "plan": plan})
+        write_json(root.p("dryruns.json"), rows)
+
+
+def dryrun_hashes(root):
+    return [row["hash"] for row in read_json(root.p("dryruns.json"), [])]
+
+
 def approve(root, plan_hash):
     if not PLAN_HASH.match(plan_hash or ""):
         raise CrucibleError(f"{plan_hash!r} is not a plan hash (8 to 64 lowercase hex characters)")
+    if plan_hash not in dryrun_hashes(root):
+        raise CrucibleError(f"refused: no `file --dry-run` produced plan {plan_hash}; run the dry run, show the "
+                            "user its list, then approve the hash it printed")
     approved = read_json(root.p("approvals.json"), [])
     if plan_hash not in [row["hash"] for row in approved]:
         approved.append({"hash": plan_hash, "at": now()})

@@ -54,15 +54,15 @@ class AnswerTests(CrucibleCase):
                 break
             seen.append(out)
             if out.startswith("permissions."):
-                self.assertEqual(run(root, "grant", out.split(".", 1)[1], "no")[0], 0)
+                self.assertEqual(run(root, "grant", out.split(".", 1)[1], "no", "--words", "test")[0], 0)
             elif out == "auto_file":
-                run(root, "answer", out, "true")
+                run(root, "answer", out, "true", "--words", "test")
             elif out == "blocker_fixes":
-                run(root, "answer", out, '{"mode": "each"}')
+                run(root, "answer", out, '{"mode": "each"}', "--words", "test")
             elif out == "memory":
-                run(root, "answer", out, '{"kind": "none"}')
+                run(root, "answer", out, '{"kind": "none"}', "--words", "test")
             else:
-                run(root, "answer", out, "[]")
+                run(root, "answer", out, "[]", "--words", "test")
         self.assertEqual(tuple(seen), INTERVIEW_ORDER)
 
     def test_answer_records_the_users_words(self):
@@ -86,7 +86,7 @@ class AnswerTests(CrucibleCase):
     def test_answer_refuses_other_internal_keys(self):
         root = self.fresh()
         for key in ("confirmed", "version", "repos", "answers"):
-            self.assertEqual(run(root, "answer", key, "true")[0], 1, key)
+            self.assertEqual(run(root, "answer", key, "true", "--words", "test")[0], 1, key)
         self.assertFalse(self.config(root)["confirmed"])
 
     def test_answer_refuses_the_permission_section(self):
@@ -107,7 +107,7 @@ class AnswerTests(CrucibleCase):
 
     def test_dict_answer_keeps_the_defaults_it_does_not_name(self):
         root = self.fresh()
-        run(root, "answer", "blocker_fixes", '{"mode": "within_limits"}')
+        run(root, "answer", "blocker_fixes", '{"mode": "within_limits"}', "--words", "test")
         self.assertEqual(self.config(root)["blocker_fixes"],
                          {"mode": "within_limits", "landing": "pr", "branch": None, "live_changes": "never"})
 
@@ -116,7 +116,7 @@ class AnswerTests(CrucibleCase):
         for key, value in (("auto_file", "maybe"), ("blocker_fixes.mode", "sometimes"),
                            ("blocker_fixes.landing", "email"), ("memory.kind", "notes"),
                            ("blocker_fixes", '{"mode": "sometimes"}')):
-            self.assertEqual(run(root, "answer", key, value)[0], 1, key)
+            self.assertEqual(run(root, "answer", key, value, "--words", "test")[0], 1, key)
         self.assertIsNone(self.config(root)["auto_file"])
 
     def test_answer_sets_auto_file_and_next_moves_on(self):
@@ -126,14 +126,14 @@ class AnswerTests(CrucibleCase):
 
     def test_memory_command_counts_as_answering_memory(self):
         root = self.fresh()
-        run(root, "memory", "none")
+        run(root, "memory", "none", "--words", "test")
         order = []
         for _ in range(len(INTERVIEW_ORDER)):
             out = run(root, "next")[1].strip()
             order.append(out)
             if out.startswith("permissions."):
                 break
-            run(root, "answer", out, "true" if out == "auto_file" else '{"mode": "never"}' if out == "blocker_fixes" else "[]")
+            run(root, "answer", out, "true" if out == "auto_file" else '{"mode": "never"}' if out == "blocker_fixes" else "[]", "--words", "test")
         self.assertNotIn("memory", order)
 
     def test_answer_works_before_confirm(self):

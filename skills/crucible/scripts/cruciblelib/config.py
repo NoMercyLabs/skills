@@ -204,6 +204,9 @@ def describe_memory(memory):
 def cmd_memory(args):
     root = Root(args.root)
     cfg = root.config()
+    if not (args.words or "").strip():
+        raise CrucibleError("refused: the memory choice is the user's decision: ask the user, then record their "
+                            "own words with --words")
     if args.kind == "grimoira":
         cfg["memory"] = {"kind": "grimoira", "instance": args.instance or "default"}
     else:
@@ -240,6 +243,7 @@ def register(sub):
     p = sub.add_parser("memory", help="record the user's permanent memory choice")
     p.add_argument("kind", choices=["grimoira", "none"])
     p.add_argument("--instance", help="grimoira instance name")
+    p.add_argument("--words", help="the user's own words (required)")
     p.set_defaults(func=cmd_memory)
     p = sub.add_parser("confirm", help="mark the config as approved by the user")
     p.set_defaults(func=cmd_confirm)

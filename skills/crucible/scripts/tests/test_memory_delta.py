@@ -22,7 +22,7 @@ class MemoryTests(CrucibleCase):
         self.assertEqual(code, 1)
         self.assertIn("memory not chosen", err)
         self.assertFalse(read_json(os.path.join(root, "config.json"))["confirmed"])
-        code, out, err = run(root, "memory", "none")
+        code, out, err = run(root, "memory", "none", "--words", "test")
         self.assertEqual(code, 0, err)
         self.answer_everything(root)
         code, out, err = run(root, "confirm")
@@ -36,7 +36,7 @@ class MemoryTests(CrucibleCase):
 
     def test_memory_grimoira_records_the_instance_and_confirm_passes(self):
         root, repo = self.make_root({"a.py": "x = 1\n"}, confirm=False, memory=False)
-        code, out, err = run(root, "memory", "grimoira", "--instance", "work")
+        code, out, err = run(root, "memory", "grimoira", "--instance", "work", "--words", "test")
         self.assertEqual(code, 0, err)
         self.assertEqual(read_json(os.path.join(root, "config.json"))["memory"], {"kind": "grimoira", "instance": "work"})
         self.answer_everything(root)
@@ -46,7 +46,7 @@ class MemoryTests(CrucibleCase):
         root, repo = self.make_root({"a.py": "x = 1\n"}, confirm=False, memory=False)
         code, out, err = run(root, "summary")
         self.assertIn("permanent memory: not chosen yet", out)
-        run(root, "memory", "none")
+        run(root, "memory", "none", "--words", "test")
         code, out, err = run(root, "summary")
         self.assertIn("permanent memory: none", out)
         self.assertIn("cannot skip files already read", out)
@@ -86,7 +86,7 @@ class DeltaTests(CrucibleCase):
     def second_audit(self, repo, old_root, *extra):
         new_root = os.path.join(self.tmp(), "audit2")
         self.assertEqual(run(new_root, "init", "--repo", repo)[0], 0)
-        self.assertEqual(run(new_root, "memory", "none")[0], 0)
+        self.assertEqual(run(new_root, "memory", "none", "--words", "test")[0], 0)
         self.answer_everything(new_root)
         self.assertEqual(run(new_root, "confirm")[0], 0)
         code, out, err = run(new_root, "inventory", "--delta", os.path.join(old_root, "coverage.json"), *extra)
