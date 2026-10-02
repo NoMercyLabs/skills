@@ -100,6 +100,18 @@ class FixPlanRefusalTests(BlockerCase):
     def test_fix_plan_needs_evidence(self):
         self.refused("evidence", evidence=None)
 
+    def test_fix_command_with_network_verb_refused(self):
+        for command in ("git push origin main", "git -C . clone https://example.com/x.git", "gh pr create", "curl -O x",
+                        "wget x", "ssh host ls", "scp a b:c", "nc host 80", "/usr/bin/curl x", "curl.exe x"):
+            for field in ("change", "proof"):
+                with self.subTest(command=command, field=field):
+                    blocker = self.add()
+                    code, out, err = run(self.root, *self.plan_args(blocker, **{field: command}))
+                    self.assertEqual(code, 1, out)
+                    self.assertIn(command.split()[0], err)
+                    self.assertIn("you run it yourself", err)
+                    self.assertFalse(os.path.exists(os.path.join(self.root, "fixes", blocker + ".json")))
+
     def test_fix_touching_must_not_change_refused_at_plan(self):
         run(self.root, "brief", "answer", "must_never_change", "--words", "lib.py stays as it is")
         self.refused("must never change")
@@ -179,6 +191,20 @@ class FixRunTests(BlockerCase):
         self.assertEqual(self.log()[-1]["status"], "failed")
         self.assertIn("failed", out + err)
 
+    def test_fix_run_refuses_a_network_command_in_a_stored_plan(self):
+        self.allow()
+        blocker = self.planned()
+        path = os.path.join(self.root, "fixes", blocker + ".json")
+        plan = self.read(self.root, f"fixes/{blocker}.json")
+        plan["change"] = ["git", "push", "origin", "main"]
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(plan, fh)
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1)
+        self.assertIn("git push", err)
+        self.assertIn("broken", self.lib_text())
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "open")
+
     def test_fix_touching_must_not_change_refused(self):
         self.allow()
         blocker = self.planned()
@@ -187,3 +213,24 @@ class FixRunTests(BlockerCase):
         self.assertEqual(code, 1)
         self.assertIn("must never change", err)
         self.assertIn("broken", self.lib_text())
+
+
+class BlockerReportTests(BlockerCase):
+    def test_report_lists_blockers(self):
+        first = self.add("the readers cannot load the module", stage="inventory")
+        self.add("the board has no Severity field", stage="filing")
+        rows = self.read(self.root, "blockers.json")
+        rows[0]["status"] = "failed"
+        with open(os.path.join(self.root, "blockers.json"), "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(rows, fh)
+        third = self.add("a fixed one", stage="gate")
+        rows = self.read(self.root, "blockers.json")
+        rows[2]["status"] = "fixed"
+        with open(os.path.join(self.root, "blockers.json"), "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(rows, fh)
+        code, out, err = run(self.root, "report")
+        self.assertEqual(code, 0, err)
+        self.assertIn("blockers: 3 (open 1, fixed 1, failed 1)", out)
+        self.assertIn(f"  {first} inventory: the readers cannot load the module", out)
+        self.assertIn("  B-002 filing: the board has no Severity field", out)
+        self.assertNotIn(third + " gate", out)
