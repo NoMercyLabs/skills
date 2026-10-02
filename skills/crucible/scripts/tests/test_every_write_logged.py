@@ -10,6 +10,7 @@ from .test_blockers import BlockerCase
 from .test_costs import RELEASE, RULES
 from .test_knowledge import KnowledgeCase
 from .test_lessons import PASSED, SHAPE, LessonCase
+from .test_system import SystemCase
 
 
 def actions(root):
@@ -80,3 +81,19 @@ class EveryFixRunIsLoggedTests(BlockerCase):
         new = actions(self.root)[before:]
         self.assertTrue(any(row["command"] == f"fix run {blocker}" and row["status"] == "ok"
                             and row["result"].startswith("fixed") for row in new), new)
+
+
+class EveryWorkspaceCloneIsLoggedTests(SystemCase):
+    def test_log_every_write_workspace_clone_logs_the_clone(self):
+        repo = self.git_repo({"app.py": "x = 1\n"})
+        root = self.init_root(repo)
+        base = os.path.join(self.tmp(), "base")
+        self.assertEqual(run(root, "workspace", "choose", "base_folder", "--base", base, "--words", "a new folder")[0], 0)
+        self.assertEqual(run(root, "grant", "workspace_clones", "yes", "--bound", "repos=svc", "--words", "clone svc")[0], 0)
+        before = len(actions(root))
+        code, out, err = run(root, "workspace", "clone", "--base", base)
+        self.assertEqual(code, 0, err)
+        self.assertTrue(os.path.isfile(os.path.join(base, "svc", "app.py")))
+        new = actions(root)[before:]
+        self.assertTrue(any(row["group"] == "workspace_clones" and row["command"].startswith("clone 1 repos into")
+                            and row["status"] == "ok" and "svc" in row["result"] for row in new), new)
