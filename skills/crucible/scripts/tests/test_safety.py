@@ -137,6 +137,15 @@ class PlantedViolations(unittest.TestCase):
         for call in ("os.system('ls')", "os.popen('ls')", "os.spawnl(0, 'a')", "os.execv('a', [])"):
             self.assertEqual(self.rules("import os\n" + call + "\n"), {"os-exec"}, call)
 
+    def test_no_risky_code_patterns(self):
+        cases = {"eval-exec": "x = eval('1')\nexec('y = 2')\n",
+                 "shell-true": "import subprocess\nsubprocess.run(['ls'], shell=True)\n",
+                 "os-exec": "import os\nos.system('ls')\n",
+                 "dynamic-import": "m = __import__('os')\n",
+                 "encoded-blob": "import base64\nbase64.b64decode('aGk=')\nDATA = '" + "QUJD" * 20 + "'\n"}
+        for rule, source in cases.items():
+            self.assertIn(rule, self.rules(source, "cruciblelib/config.py"), rule)
+
     def test_shell_true_is_refused(self):
         found = self.rules("import subprocess\nsubprocess.run(['ls'], shell=True)\n", "cruciblelib/config.py")
         self.assertEqual(found, {"shell-true"})
@@ -163,6 +172,17 @@ class PlantedViolations(unittest.TestCase):
     def test_network_modules_are_allowed_in_the_adapters(self):
         self.assertEqual(self.scan("import urllib.request\n", "cruciblelib/trackers/github.py"), [])
         self.assertEqual(self.scan("import socket\n", "cruciblelib/knowledge.py"), [])
+
+    def test_no_network_outside_adapters(self):
+        module = "import socket\n"
+        verb = "import subprocess\nsubprocess.run(['git', 'fetch'])\n"
+        gh = "import subprocess\nsubprocess.run(['gh', 'api', 'x'])\n"
+        self.assertIn("network-module", self.rules(module, "cruciblelib/inventory.py"))
+        self.assertIn("network-call", self.rules(verb, "cruciblelib/config.py"))
+        self.assertIn("network-call", self.rules(gh, "cruciblelib/config.py"))
+        self.assertEqual(self.scan(module, "cruciblelib/trackers/github.py"), [])
+        self.assertNotIn("network-call", self.rules(verb, "cruciblelib/clones.py"))
+        self.assertNotIn("network-call", self.rules(gh, "cruciblelib/trackers/github.py"))
 
     def test_a_subprocess_outside_the_adapters_is_refused(self):
         self.assertEqual(self.rules("import subprocess\nsubprocess.run(['ls'])\n", "cruciblelib/inventory.py"),

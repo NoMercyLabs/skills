@@ -64,6 +64,28 @@ class SecretFilesAreNeverRead(CrucibleCase):
             Root(root).snapshot_lines("svc", "keys/id_rsa")
 
 
+class SecretFilesNeverReadByAnyCommand(CrucibleCase):
+    def test_secret_files_never_read_by_any_command(self):
+        files = {"app.py": "x = 1\n", ".env": "A=ENV-BODY-7\n", "keys/id_rsa": "RSA-BODY-3\n",
+                 "tls/site.key": "KEY-BODY-2\n"}
+        root = self.make_inventoried(files)
+        snap = os.path.join(root, "snapshot", "svc")
+        on_disk = [os.path.join(folder, n) for folder, _, names in os.walk(snap) for n in names]
+        for path in on_disk:
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
+            for body in ("ENV-BODY-7", "RSA-BODY-3", "KEY-BODY-2"):
+                self.assertNotIn(body, text)
+        self.assertEqual([os.path.basename(p) for p in on_disk], ["app.py"])
+        for secret in (".env", "keys/id_rsa", "tls/site.key"):
+            with self.assertRaises(CrucibleError, msg=secret):
+                Root(root).snapshot_lines("svc", secret)
+        unit = Root(root).units()[0]
+        code, out, err = run(root, "show", unit, ".env")
+        self.assertEqual(code, 1)
+        self.assertNotIn("ENV-BODY-7", out + err)
+
+
 class TrackedSecretReport(CrucibleCase):
     def tracked_repo(self, files):
         repo = self.make_repo(files)
@@ -86,6 +108,13 @@ class TrackedSecretReport(CrucibleCase):
             self.assertIn(path, out)
         for text in ("ENV-BODY", "PEM-BODY", "RSA-BODY", ".env.example", "app.py"):
             self.assertNotIn(text, out)
+
+    def test_secret_file_tracked_reported_by_path_never_by_content(self):
+        repo = self.tracked_repo({"app.py": "x = 1\n", "config/.env.local": "TOKEN=SECRET-VALUE-XYZ\n"})
+        code, out, err = run(self.audit(repo), "safety")
+        self.assertEqual(code, 1, err)
+        self.assertIn("config/.env.local", out)
+        self.assertNotIn("SECRET-VALUE-XYZ", out + err)
 
     def test_it_reports_clean_when_nothing_secret_is_tracked(self):
         repo = self.tracked_repo({"app.py": "x = 1\n", ".env.example": "A=\n"})
