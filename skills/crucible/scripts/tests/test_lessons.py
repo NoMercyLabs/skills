@@ -252,6 +252,13 @@ class ActiveLessonTunesPlanTests(LessonCase):
         self.assertNotEqual(before["reader_tier"], "strong")
         self.assertEqual(after["reader_tier"], "strong")
 
+    def test_lesson_model_tier_cannot_lower_tier(self):
+        root, _ = self.make_root(self.FILES, config={"unit_bytes": 480})
+        before = plan_for(Root(root))["units"][0]["reader_tier"]
+        self.assertNotEqual(before, "fast")
+        activate(root, {"model_tier": {"normal": "fast"}})
+        self.assertEqual(plan_for(Root(root))["units"][0]["reader_tier"], before)
+
     def test_model_tier_lesson_names_only_risk_classes(self):
         root, _ = self.audit()
         self.write_lesson(root, "L-badrisk", {"model_tier": {"mystery": "fast"}})
