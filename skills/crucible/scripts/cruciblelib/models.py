@@ -97,8 +97,10 @@ def build_plan(cfg, units, fable, reader_tiers=None, factor=1):
     chosen = cfg["models"]
     reader_tier = bulk_tier(chosen["reader"])
     for unit in units:
-        unit["reader_tier"] = (reader_tiers or {}).get(unit["risk"]) or (
-            LOW_TIER if unit["risk"] == "low" else reader_tier)
+        default = LOW_TIER if unit["risk"] == "low" else reader_tier
+        tuned = (reader_tiers or {}).get(unit["risk"]) or default
+        # A lesson only tightens: a tier below the configured one is ignored.
+        unit["reader_tier"] = max(default, tuned, key=TIERS.index)
     per_tier, tokens = {}, {}
     for unit in units:
         per_tier[unit["reader_tier"]] = per_tier.get(unit["reader_tier"], 0) + 1
