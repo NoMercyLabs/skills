@@ -217,21 +217,40 @@ def fix_base(root, repo):
     return base
 
 
+def start_fix_branch(root, row, repo, branch):
+    """Cut the fix branch from the base before the change runs, so the change and its proof see the base and this
+    fix only, and the fix branch (and its pull request) holds only this fix."""
+    return run_action(root, GROUP, f"branch {row['id']}",
+                      lambda: git_step(repo, "checkout", "-b", branch, fix_base(root, repo)))
+
+
 def commit_fix(root, row, plan, repo, branch):
-    """Commit the touched files on a fix branch cut from the base, as the user's own git config says, so the fix
-    branch (and its pull request) holds only this fix."""
+    """Commit the touched files on the fix branch, as the user's own git config says."""
     files = [touch_path(t) for t in plan["touches"] if os.path.isfile(os.path.join(repo, *touch_path(t).split("/")))]
     title = f"fix({row['stage'] or 'audit'}): {row['id']} {row['description']}"
 
     def action():
         if not files:
             raise CrucibleError("the plan touches no file the fix can commit")
-        git_step(repo, "checkout", "-b", branch, fix_base(root, repo))
         git_step(repo, "add", "--", *files)
         git_step(repo, "commit", "-q", "-m", title, "--", *files)
         return run_command(["git", "-C", repo, "rev-parse", "--short", "HEAD"], repo)[1]
 
     return run_action(root, GROUP, f"commit {row['id']}", action)
+
+
+def conflicting_fix(root, repo, branch, files):
+    """The id of an already merged fix that touched one of the conflicting files."""
+    base = fix_base(root, repo)
+    listed = run_command(["git", "-C", repo, "branch", "--list", "crucible/fix-*", "--format=%(refname:short)"], repo)
+    for other in listed[1].split():
+        if other == branch or run_command(["git", "-C", repo, "merge-base", "--is-ancestor", other, INTEGRATION],
+                                          repo)[0]:
+            continue
+        touched = run_command(["git", "-C", repo, "diff", "--name-only", f"{base}...{other}"], repo)[1].split()
+        if set(touched) & set(files):
+            return other.rsplit("fix-", 1)[1].upper()
+    return "another fix"
 
 
 def merge_fix(root, row, repo, branch):
@@ -244,8 +263,10 @@ def merge_fix(root, row, repo, branch):
         git_step(repo, "checkout", INTEGRATION)
         code, text = run_command(["git", "-C", repo, "merge", "--no-edit", branch], repo)
         if code != 0:
+            clash = run_command(["git", "-C", repo, "diff", "--name-only", "--diff-filter=U"], repo)[1].split()
             run_command(["git", "-C", repo, "merge", "--abort"], repo)
-            raise CrucibleError(f"git merge failed: {text}")
+            other = conflicting_fix(root, repo, branch, clash)
+            raise CrucibleError(f"git merge failed: conflicts with {other}: {text}")
         return f"merged {branch} into {INTEGRATION}"
 
     return run_action(root, GROUP, f"merge {row['id']}", action)
@@ -297,6 +318,11 @@ def cmd_fix_run(args):
     for source in plan["backup"]:
         backup(root, f"{args.blocker_id}-{touch_path(source).replace('/', '-')}",
                os.path.join(repo, *touch_path(source).split("/")))
+    try:
+        start_fix_branch(root, row, repo, fix_branch(row, plan))
+    except CrucibleError as exc:
+        set_status(root, args.blocker_id, "failed")
+        raise CrucibleError(f"{args.blocker_id} could not start its fix branch: {exc}")
     code, text = run_command(plan["change"], repo)
     if code == 0:
         code, text = run_command(plan["proof"], repo)
