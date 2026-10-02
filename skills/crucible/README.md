@@ -17,9 +17,9 @@ Two things run beside the pipeline. A **blocker** (a missing tool, a failing com
 
 ## What it looks like
 
-![A project board of filed findings, grouped by repository](docs/mockups/board.svg)
+![A project board of filed findings, in the Start here view](docs/mockups/board.svg)
 
-The data is made up. `crucible file --apply` creates each issue and adds it to the board; it creates no columns or fields, so this view is grouped by repository.
+The data is made up. `crucible board apply` creates the Area, Stage, Severity, Priority, Size and Owner fields and the views Start here, By stage, By repo and By owner (Security too, on a private board). `crucible file --apply` then creates each issue, adds it to the board and sets those fields. The Start here view shows the first stage. The API cannot set a view's group by, so you set that on the board page.
 
 ![One filed issue, with its root cause chain and "Do not fix by" section](docs/mockups/issue.svg)
 

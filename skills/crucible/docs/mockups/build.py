@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build board.svg and issue.svg from mockup-data.json. Standard library only; same input, same bytes.
 
-The section names and the pointer text are read from scripts/cruciblelib/filing.py and checked, so a change in
+The section names and the pointer text are read from scripts/cruciblelib/filing.py, the board field, view
+and stage names from scripts/cruciblelib/board.py, and checked, so a change in
 what crucible files breaks this build instead of leaving the pictures wrong.
 """
 import ast
@@ -12,6 +13,7 @@ from xml.sax.saxutils import escape
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FILING = os.path.join(HERE, "..", "..", "scripts", "cruciblelib", "filing.py")
+BOARD = os.path.join(HERE, "..", "..", "scripts", "cruciblelib", "board.py")
 
 BG, PANEL, BORDER, TEXT, MUTED, GREEN = "#0d1117", "#161b22", "#30363d", "#e6edf3", "#7d8590", "#3fb950"
 BLUE, PURPLE = "#79c0ff", "#d2a8ff"
@@ -110,50 +112,99 @@ def svg_open(width, height, title):
             f'<title>{escape(title)}</title>\n{rect(0, 0, width, height, BG, rx=0)}\n')
 
 
+def read_board():
+    """-> (field names, view names, the stage name for shared root causes), read from scripts/cruciblelib/board.py."""
+    with open(BOARD, encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    consts = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant):
+            for target in node.targets:
+                consts[getattr(target, "id", "")] = node.value.value
+    fields, views = [], []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == "wanted_fields":
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Tuple) and len(sub.elts) == 2 and isinstance(sub.elts[0], ast.Constant) \
+                        and isinstance(sub.elts[0].value, str):
+                    fields.append(sub.elts[0].value)
+        if isinstance(node, ast.FunctionDef) and node.name == "build_views":
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Dict):
+                    for key, value in zip(sub.keys, sub.values):
+                        if isinstance(key, ast.Constant) and key.value == "name" and isinstance(value, ast.Constant):
+                            views.append(value.value)
+    return fields, views, consts["CAUSES_STAGE"]
+
+
+SEVERITY_COLORS = {"critical": "#ff7b72", "high": "#ffa657", "medium": "#d29922", "low": GREEN}
+
+
+def field_chip(x, y, name, value):
+    color = SEVERITY_COLORS.get(value, BLUE) if name == "Severity" else PURPLE if name == "Priority" else BLUE
+    label = f"{name}: {value}"
+    w = int(text_width(label, 12)) + 18
+    parts = [rect(x, y, w, 20, color, rx=10, extra=' fill-opacity="0.15"'),
+             rect(x, y, w, 20, "none", stroke=color, rx=10, extra=' stroke-opacity="0.45"'),
+             text_el(x + 9, y + 14, escape(label), 12, color)]
+    return "".join(parts), w
+
+
 def build_board(data):
-    col_w, gap, left, top = 372, 16, 28, 96
-    cols = data["columns"]
-    width = left * 2 + col_w * len(cols) + gap * (len(cols) - 1)
-    inner = col_w - 24
-    laid = []
-    for col in cols:
-        y = 54
-        cards = []
-        for card in col["cards"]:
-            title_lines = wrap(card["title"], 14, inner - 20)
-            h = 12 + 16 + 8 + 19 * len(title_lines) + 8 + 20 + 12
-            cards.append((y, h, title_lines, card))
-            y += h + 10
-        laid.append((y + 2, cards))
-    col_h = max(item[0] for item in laid)
+    fields, views, stage = read_board()
+    board = data["board"]
+    for need in ("Severity", "Priority", "Stage"):
+        if need not in fields:
+            raise SystemExit(f"board.py no longer creates the field {need}: {fields}")
+    if [v["name"] for v in board["views"]] != views[:len(board["views"])] or board["active"] not in views:
+        raise SystemExit(f"view names differ from board.py build_views: {views}")
+    if board["stage"] != stage:
+        raise SystemExit(f"stage name differs from board.py CAUSES_STAGE: {stage!r}")
+    left, top, width = 28, 132, 880
+    inner = width - left * 2 - 24
+    y = 54
+    cards = []
+    for card in board["cards"]:
+        title_lines = wrap(card["title"], 14, inner - 40)
+        h = 12 + 16 + 8 + 19 * len(title_lines) + 8 + 20 + 8 + 20 + 12
+        cards.append((y, h, title_lines, card))
+        y += h + 10
+    col_h = y + 2
     height = top + col_h + 28
-    out = [svg_open(width, height, "Made-up GitHub Project board of audit findings, grouped by repository")]
-    out.append(text_el(left, 40, escape(data["project"]), 20, TEXT, "600"))
-    tab = data["view"]
-    tab_w = int(text_width(tab, 13)) + 28
-    out.append(rect(left, 56, tab_w, 28, PANEL, BORDER, rx=14))
-    out.append(text_el(left + 14, 75, escape(tab), 13, TEXT))
-    for i, (col, (col_end, cards)) in enumerate(zip(cols, laid)):
-        x = left + i * (col_w + gap)
-        out.append(rect(x, top, col_w, col_h, PANEL, BORDER, rx=8))
-        out.append(f'<circle cx="{x + 20}" cy="{top + 26}" r="5" fill="{GREEN}"/>')
-        out.append(text_el(x + 34, top + 31, escape(col["repo"]), 14, TEXT, "600"))
-        count = str(len(col["cards"]))
-        out.append(rect(x + 34 + int(text_width(col["repo"], 14)) + 8, top + 15, 24, 20, BG, BORDER, rx=10))
-        out.append(text_el(x + 34 + int(text_width(col["repo"], 14)) + 20, top + 30, count, 12, MUTED, anchor="middle"))
-        for cy, ch, title_lines, card in cards:
-            cx, cyy = x + 12, top + cy
-            out.append(rect(cx, cyy, inner, ch, BG, BORDER, rx=6))
-            out.append(issue_icon(cx + 20, cyy + 22))
-            out.append(text_el(cx + 36, cyy + 27, escape(f"{col['repo']} #{card['number']}"), 12, MUTED))
-            for n, line in enumerate(title_lines):
-                out.append(text_el(cx + 14, cyy + 52 + 19 * n, escape(line), 14, TEXT, "600"))
-            chip_y = cyy + ch - 32
-            chip_x = cx + 14
-            for label in card["labels"]:
-                svg, w = chip(chip_x, chip_y, label)
-                out.append(svg)
-                chip_x += w + 6
+    out = [svg_open(width, height, "Made-up GitHub Project board of audit findings, view Start here")]
+    out.append(text_el(left, 40, escape(board["project"]), 20, TEXT, "600"))
+    tab_x = left
+    for view in board["views"]:
+        tab_w = int(text_width(view["name"], 13)) + 28
+        active = view["name"] == board["active"]
+        out.append(rect(tab_x, 56, tab_w, 28, PANEL if active else BG, BORDER if active else BG, rx=14))
+        out.append(text_el(tab_x + 14, 75, escape(view["name"]), 13, TEXT if active else MUTED, "600" if active else None))
+        tab_x += tab_w + 6
+    active_view = next(v for v in board["views"] if v["name"] == board["active"])
+    out.append(text_el(left, 108, escape(f"Group by {active_view['group_by']}. Filter: {active_view['filter']}"), 13, MUTED))
+    out.append(rect(left, top, width - left * 2, col_h, PANEL, BORDER, rx=8))
+    out.append(f'<circle cx="{left + 20}" cy="{top + 26}" r="5" fill="{GREEN}"/>')
+    out.append(text_el(left + 34, top + 31, escape(stage), 14, TEXT, "600"))
+    count_x = left + 34 + int(text_width(stage, 14)) + 8
+    out.append(rect(count_x, top + 15, 24, 20, BG, BORDER, rx=10))
+    out.append(text_el(count_x + 12, top + 30, str(len(cards)), 12, MUTED, anchor="middle"))
+    for cy, ch, title_lines, card in cards:
+        cx, cyy = left + 12, top + cy
+        out.append(rect(cx, cyy, inner, ch, BG, BORDER, rx=6))
+        out.append(issue_icon(cx + 20, cyy + 22))
+        out.append(text_el(cx + 36, cyy + 27, escape(f"{card['repo']} #{card['number']}"), 12, MUTED))
+        for n, line in enumerate(title_lines):
+            out.append(text_el(cx + 14, cyy + 52 + 19 * n, escape(line), 14, TEXT, "600"))
+        chip_x = cx + 14
+        for name in ("Severity", "Priority", "Size", "Owner"):
+            svg, w = field_chip(chip_x, cyy + ch - 60, name, card[name.lower()])
+            out.append(svg)
+            chip_x += w + 6
+        chip_x = cx + 14
+        for label in card["labels"]:
+            svg, w = chip(chip_x, cyy + ch - 32, label)
+            out.append(svg)
+            chip_x += w + 6
     out.append("</svg>\n")
     return "".join(s if s.endswith("\n") else s + "\n" for s in out)
 
