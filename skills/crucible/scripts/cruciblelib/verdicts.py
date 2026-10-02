@@ -1,5 +1,6 @@
 import copy
 import glob
+import os
 import re
 
 from . import brief, rootcause
@@ -173,6 +174,32 @@ def apply_fixes(root, unit):
     return cands
 
 
+def snapshot_writes(root, state):
+    """What accept may write before the gate has judged it: findings, the accepted map, the routing file."""
+    files = {}
+    for path in glob.glob(root.p("findings", "F-*.json")) + [root.p("routing.json")]:
+        if os.path.isfile(path):
+            with open(path, "rb") as fh:
+                files[path] = fh.read()
+    return files, copy.deepcopy(state["accepted"])
+
+
+def restore_writes(root, state, before):
+    """A refused accept leaves findings/, routing.json and state['accepted'] as they were before the call."""
+    files, accepted = before
+    for path in glob.glob(root.p("findings", "F-*.json")):
+        if path not in files:
+            os.remove(path)
+    routing = root.p("routing.json")
+    if os.path.isfile(routing) and routing not in files:
+        os.remove(routing)
+    for path, data in files.items():
+        with open(path, "wb") as fh:
+            fh.write(data)
+    state["accepted"] = accepted
+    root.save_state(state)
+
+
 def cmd_accept(args):
     root = Root(args.root)
     root.require_confirmed()
@@ -196,6 +223,7 @@ def cmd_accept(args):
     verdicts = load_verdicts(root, unit)
     promoted, routed, failed, route_failed = [], [], 0, 0
     cfg = root.config()
+    before = snapshot_writes(root, state)
     for c in cands:
         src = cand_source(unit, c)
         if verdicts[src]["verdict"] == "reject":
@@ -230,6 +258,7 @@ def cmd_accept(args):
             for p in problems:
                 print(f"  {p}")
     if failed:
+        restore_writes(root, state, before)
         print(f"ACCEPT REFUSED {unit}: the gate failed {failed} of {len(promoted) + route_failed} findings; "
               f"fix the candidates and run accept again")
         return 1
