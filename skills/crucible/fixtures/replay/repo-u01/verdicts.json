@@ -1,0 +1,31 @@
+{
+ "repo-u01#6cd7bcc6": {
+  "verdict": "accept",
+  "checked": [
+   "app/db.py:209"
+  ],
+  "reason": "the cited line does what the finding says"
+ },
+ "repo-u01#352553ec": {
+  "verdict": "accept",
+  "checked": [
+   "app/routes.py:87"
+  ],
+  "reason": "the cited line does what the finding says"
+ },
+ "repo-u01#62bbf6d9": {
+  "verdict": "accept",
+  "checked": [
+   "deploy/deploy.sh:71"
+  ],
+  "reason": "the cited line does what the finding says"
+ },
+ "repo-u01#570da580": {
+  "verdict": "reject",
+  "checked": [
+   "app/config.py:1"
+  ],
+  "other_defect": "none",
+  "reason": "the line only sets a constant and nothing misuses it"
+ }
+}
