@@ -9,48 +9,70 @@ Before the first interview question, and again at the top of the plan, say in pl
 - The code the readers and verifiers read is sent to the **model provider** that runs the agents. Name the provider. This applies to every file in scope.
 - Issue and advisory text goes to the tracker. Issues on a public repo are public. Security advisories stay private drafts.
 - Memory writes to Grimoira stay on this machine.
+- Knowledge sources are read only, and what is fetched lands in the audit folder first.
 - Live checks contact the named targets and nothing else.
 
 If the user does not accept the first point, stop. Do not read a file.
 
 ## The plan
 
-`crucible plan` lists every action the run can take, in seven groups, each with its bounds and cost. Show the whole plan. Then ask for one explicit yes or no per group. A group is never granted by silence, by a yes to a different group, or by the interview answers.
+`crucible plan` lists every group with its bounds, its cost and where its data goes. Show the whole plan. Then ask for one explicit yes or no per group. A group is never granted by silence, by a yes to a different group, or by the interview answers.
 
-| # | Group | Bounds the plan states |
-| --- | --- | --- |
-| 1 | Local reads | the repos and folders in scope; always needed |
-| 2 | Agent runs | number of readers and verifiers, model tier per role, estimated tokens, the hard cap |
-| 3 | Installs | the memory plugin (the user runs its commands); anything else the setup needs, named |
-| 4 | Memory writes | which Grimoira instance, which kinds of record |
-| 5 | Tracker writes | each of these is a separate grant: create or map the board and its fields; create labels (named); create issues (maximum count, which repos); draft advisories (which repos); assignees (named); comments on existing issues |
-| 6 | Live checks | each target and each command, read-only |
-| 7 | Publishing | the final report anywhere outside the audit folder |
+| Group | Bounds the plan states |
+| --- | --- |
+| `local_reads` | the repos and folders in scope; always needed |
+| `agent_runs` | number of readers and verifiers, model tier per role, estimated tokens, the hard cap |
+| `installs` | the memory plugin (the user runs its commands); anything else the setup needs, named |
+| `memory_writes` | which Grimoira instance, which kinds of record |
+| `tracker_board` | create or map the board and its fields |
+| `tracker_labels` | create labels (named) |
+| `tracker_issues` | create issues (maximum count, which repos) |
+| `tracker_advisories` | draft advisories (which repos) |
+| `tracker_assignees` | assignees (named) |
+| `tracker_comments` | comments on existing issues |
+| `live_checks` | each target and each command, read-only |
+| `publish_report` | the final report anywhere outside the audit folder |
+| `blocker_fixes` | which blockers, how a fix lands, which systems may change live (see `blockers.md`) |
+| `knowledge_sources` | each named source, read-only, and where its text is written |
 
-## Grants
+## Commands
 
 ```sh
 python scripts/crucible.py --root ROOT plan
-python scripts/crucible.py --root ROOT grant GROUP yes
-python scripts/crucible.py --root ROOT grant GROUP no
+python scripts/crucible.py --root ROOT grant GROUP yes|no [--words "the user's words"] [--bound key=value ...]
+python scripts/crucible.py --root ROOT grant GROUP yes --reopen --words "the user's words"
 python scripts/crucible.py --root ROOT approve PLAN_HASH
+python scripts/crucible.py --root ROOT report
+python scripts/crucible.py --root ROOT answer KEY VALUE [--words "the user's words"]
+python scripts/crucible.py --root ROOT next
 ```
 
-- `grant GROUP yes|no` records the answer in `config.permissions` together with the user's own words. Record the user's own words (run `crucible grant --help` for how); never write them yourself.
-- `confirm` refuses until every group has an answer.
-- A `no` is final. The engine skips that action. Do not ask again in another form, and do not look for a way to reach the same result by another action.
-- Bounds are enforced by the engine. Every outward action (tracker, memory, install, live check, publish) checks its grant first and refuses without one. An action outside the bounds (a repo not listed, more issues than granted, a label not named, a new assignee) is refused. The run stops and reports it. It never extends a grant by itself. A wider grant is a new question to the user.
+- `grant GROUP yes|no` records `{answer, words, bounds, at}` in `config.permissions[GROUP]`. `--words` is the user's own text; never write it for them. `--bound key=value` is repeatable. Bound keys: `repos`, `max_count`, `labels`, `assignees`, `instance`, `kinds`, `sources`, `targets`, `commands`, `mode`.
+- A `no` is final. A later `grant GROUP yes` is refused unless `--reopen` is given together with the user's own `--words`. Do not ask again in another form, and do not look for another action that reaches the same result.
+- `approve PLAN_HASH` records the user's go for exactly that plan. A changed plan has a new hash and needs a new approval.
+- `answer` and `next` are the interview commands (see `interview.md`).
+- `confirm` refuses until every group has an answer, and also until the memory, filing and blocker-fix choices are answered. Its message lists what is missing.
+
+## Bounds
+
+The engine enforces the bounds. Every outward action (tracker, memory, install, live check, publish, knowledge fetch, blocker fix) goes through one gate that checks its grant first. It refuses when the group is unanswered or `no`, when a requested list is not a subset of the granted list (a repo not listed, a label not named, a new assignee), and when the requested count is above `max_count`. A refusal is logged with status `refused`. The run stops and reports it. It never extends a grant by itself. A wider grant is a new question to the user.
 
 ## Filing: one more question, asked at the start
 
-- **Show the full dry run and wait for my go** (the default). `file --apply` is refused until the user has seen the dry run and the agent runs `crucible approve PLAN_HASH` for that exact plan. A changed plan has a new hash and needs a new approval.
-- **File within the granted bounds without asking again.** The dry run is still written to disk and logged. Filing still stops at the bounds.
+This is the `auto_file` answer (interview, question 10b).
 
-Both choices are asked at the start, with the plan, not at the end.
+- **No (the default).** The dry-run list is shown. `file --apply` is refused until the user has seen it and the agent runs `crucible approve PLAN_HASH` for that exact plan.
+- **Yes.** `file --apply` runs within the granted bounds without asking again.
+
+In both cases `file --apply` needs a prior `file --dry-run` of the same plan hash, and filing stops at the bounds.
 
 ## The action log
 
-Every outward action is written to `ROOT/actions.log`: time, the grant used, the exact command with secrets masked, and the result. The engine writes the log itself. An action that cannot be logged is not taken. Do not write an entry by hand and do not edit the log.
+Every outward action is written to `ROOT/actions.log`, one JSON line each: `at`, `group`, `command`, `result`, `status`. Status is `ok`, `refused`, `skipped` or `failed`. Secrets are masked. The engine writes the log itself, and checks it is writable before it acts. An action that cannot be logged is not taken. Do not write an entry by hand and do not edit the log.
+
+## Backups
+
+Backups are on by default (`config.backups`, interview question 10d). Before any change that can lose data (a file, a tracker board or field, a config, a memory store, a running system's setting) the engine copies the old state to `config.backups.path`, or to `ROOT/backups/<timestamp>-<label>`, and logs where. If a backup is enabled and the copy fails, the change is not made. The user can choose the place, and turning backups off is their choice, recorded in the config.
 
 ## Before each phase
 
@@ -58,12 +80,13 @@ Say what happens next, how long it should take, and how many tokens it should co
 
 ## The final report
 
-The report lists:
+`crucible report` prints:
 
 - every action taken, from the log;
 - every action refused or skipped, each with its reason;
-- coverage as N of M, from `crucible status`;
-- tokens spent against the cap.
+- coverage as N of M;
+- tokens spent against the cap;
+- knowledge sources absorbed, and sources named but not absorbed.
 
 Nothing happened that the report does not show. Run `crucible report` and paste its output; do not write the report from memory.
 

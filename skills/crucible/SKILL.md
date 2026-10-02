@@ -15,7 +15,7 @@ metadata:
 
 # Crucible
 
-An crucible tests a material for what it really contains. This skill tests a system the same way: every file is read, every claim is checked by a second reader, and a script, not an agent's report, accepts each step.
+A crucible tests a material for what it really contains. This skill tests a system the same way: every file is read, every claim is checked by a second reader, and a script, not an agent's report, accepts each step.
 
 Check the engine first. One command proves it works on a sample system with known defects:
 
@@ -34,22 +34,23 @@ Before the first question, tell the user in plain words:
 - The code the agents read is sent to the model provider that runs them. That is every file in scope.
 - It costs tokens, and the user sets a cap. It takes a while and can be resumed.
 
-Then start the interview. Every question and every permission comes first: the interview, then `crucible plan` and the grants, then `confirm`. The run never stops later to ask what it could have asked here.
+Then start the interview. Every question and every permission comes first: the interview, then `crucible plan` and the grants, then `confirm`. The principle: every choice about the user's own system, risk or workflow is a question with the safest default. Product findings are filed, never fixed. Backups of anything that can be lost are on by default. The run never stops later to ask what it could have asked here.
 
 Paths below are relative to this skill's folder. `ROOT` is the audit folder (default `./crucible-audit`), given to every command as `--root ROOT`.
 
 ## The interview is mandatory, and the engine enforces it
 
-Nothing is read, inventoried or filed until the user has answered. `crucible init` detects facts by script and writes `ROOT/config.json` with `confirmed: false`. Every other command refuses to run while it is false, with the message `config not confirmed: ask the user the interview questions (references/interview.md), then run crucible confirm`. `confirm` also refuses while the memory choice (question 11) is unset.
+Nothing is read, inventoried or filed until the user has answered. `crucible init` detects facts by script and writes `ROOT/config.json` with `confirmed: false`. Every other command refuses to run while it is false, with the message `config not confirmed: ask the user the interview questions (references/interview.md), then run crucible confirm`. `confirm` also refuses while the memory, filing or blocker-fix choice or any permission group is unanswered, and lists what is missing.
 
 Procedure:
 
 1. Run `python scripts/crucible.py --root ROOT init --repo PATH [--repo PATH ...]`. It prints what it detected: remotes, languages and lines per repo, CI files, suggested skips.
-2. Open `references/interview.md`. Ask its 11 questions **one at a time**. Show the default with each. Never answer for the user, never batch two questions, never skip one because the answer looks obvious.
-3. Write each answer into `ROOT/config.json` at the key named in that file.
+2. Open `references/interview.md`. Run `crucible next`: it prints the next unanswered key. Ask that question. Ask **one at a time**, show the default with each, never answer for the user, never batch two questions, never skip one because the answer looks obvious.
+3. Record each answer with `python scripts/crucible.py --root ROOT answer KEY VALUE --words "the user's words"`. Never edit `ROOT/config.json` by hand. Repeat from step 2 until `next` has no interview key left. The tracker question is followed at once by "May I file the findings there automatically?" (`auto_file`).
 4. Run `python scripts/crucible.py --root ROOT summary`. Show the whole output to the user.
-5. Run `python scripts/crucible.py --root ROOT plan`. It lists every action the run can take, in seven groups, with bounds and cost. Show it. Ask for one yes or no per group and record each with `crucible grant GROUP yes|no`. A no is final. Ask the filing question too: show the dry run and wait for a go (default), or file within the granted bounds. `references/permissions.md` has the groups, the data-flow statement and the rules.
-6. When the user says yes to the summary and every group has an answer, run `python scripts/crucible.py --root ROOT confirm`. It refuses while any group or the memory choice is unanswered. A change after that goes back through `summary`, `plan` and a new yes.
+5. Run `python scripts/crucible.py --root ROOT plan`. It lists every permission group with bounds, cost and where the data goes. Show it. Ask for one yes or no per group and record each with `crucible grant GROUP yes|no --words "..." [--bound key=value]`. A no is final. `references/permissions.md` has the groups, the flags, the data-flow statement and the rules.
+6. When the user says yes to the summary and every group has an answer, run `python scripts/crucible.py --root ROOT confirm`. A change after that goes back through `summary`, `plan` and a new yes.
+7. If the user chose Grimoira, run its full onboarding and ask where more knowledge lives outside this machine (`references/interview.md`, question 11; `references/memory.md`).
 
 ## The pipeline
 
@@ -67,8 +68,11 @@ Run in this order. Each command ends in a file on disk. Commands marked "refuses
 | 8 | `crucible split UNIT` when a unit is too big for one reader | |
 | 9 | `crucible gate` | a field is empty, evidence does not match the real line, a privacy word or a key-like string is present |
 | 10 | `crucible status` | never refuses; it prints coverage N of M, findings by goal, tokens spent against the cap |
-| 11 | `crucible file --dry-run`, then (if the user chose to wait for a go) `crucible approve PLAN_HASH`, then `crucible file --apply`, then `crucible file --verify` | `--apply` without a dry run of the same plan, without approval when it is required, outside the granted bounds, or config not confirmed |
+| 11 | `crucible file --dry-run`, then (when `auto_file` is false) `crucible approve PLAN_HASH`, then `crucible file --apply`, then `crucible file --verify` | `--apply` without a dry run of the same plan, without approval when it is required, outside the granted bounds, or config not confirmed |
 | 12 | `crucible report` | |
+
+Two more command groups run beside the pipeline:/n/n- **Blockers.** When a stage cannot go on: `crucible blocker add DESCRIPTION [--stage S]`, `crucible blocker list`, `crucible fix plan BLOCKER_ID`, `crucible fix run BLOCKER_ID [--yes-words ".."]`. A fix needs the `blocker_fixes` grant, makes a backup first, and re-runs the blocked stage, which must pass. See `references/blockers.md`.
+- **Knowledge.** `crucible knowledge fetch SOURCE_NAME` pulls a granted outside source into `ROOT/knowledge/SOURCE_NAME/` as Markdown, to be absorbed by Grimoira's `index-docs --from`. See `references/memory.md`.
 
 `crucible X` in this file means `python scripts/crucible.py --root ROOT X`. Run `python scripts/crucible.py --help` for the commands the installed engine has. Never replace a missing command with a hand step: report it.
 
@@ -111,9 +115,9 @@ A rule in a prompt is a promise, and a broken promise costs nothing. Each phase 
 | Coverage | `coverage.json`, `state.json` | `status` |
 | File | the tracker, read back | `file --verify` |
 
-`references/finding-schema.md` has the finding fields and the verdict shape. `references/memory.md` says what goes into permanent memory and when. `references/permissions.md` has the permission plan.
+`references/finding-schema.md` has the finding fields and the verdict shape. `references/memory.md` says what goes into permanent memory, the Grimoira onboarding and the knowledge flow. `references/permissions.md` has the permission plan, the grant commands, the action log and backups. `references/blockers.md` has the blocker flow.
 
-Every outward action is written to `ROOT/actions.log` by the engine, and an action that cannot be logged is not taken. Before each phase, say what happens next and what it should cost.
+Every outward action is written to `ROOT/actions.log` by the engine, and an action that cannot be logged is not taken. Before any change that can lose data, the engine makes a backup first. Before each phase, say what happens next and what it should cost.
 
 The final report is the output of `crucible report`, pasted. It lists every action taken, every action refused or skipped with its reason, coverage N of M, and tokens spent against the cap. It also says what was not read, what could not be checked, and that findings were verified by a second agent, not by a human.
 

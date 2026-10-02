@@ -4,13 +4,16 @@ The skill an agent loads when asked to audit a whole system: every repo, every f
 
 ## How a run goes
 
-1. **Interview.** The agent detects your repos by script, then asks 11 questions one at a time: scope, goals, stages, tracker, advisories, other owners, privacy words, budget, models, live checks, permanent memory. Nothing runs until you say yes to the summary.
+1. **Interview.** The agent detects your repos by script, then asks its questions one at a time, each with the safest default: scope, goals, stages, tracker, whether findings may be filed automatically, advisories, other owners, privacy words, budget, models, live checks, blocker fixes, backups, permanent memory, outside knowledge sources. Each answer is recorded with `crucible answer`. You then grant or refuse each group of actions (`crucible plan`, `crucible grant`). Nothing runs until you say yes to the summary and every group has an answer.
 2. **Inventory.** Each repo is cut into units of at most 90 KB of whole files.
 3. **Read.** One reader agent per unit reads every file through a command that stamps what it shows.
 4. **Prove.** A script checks the reader's transcript: every file shown whole, every stamp valid.
 5. **Verify.** A different agent tries to prove each candidate false.
 6. **Accept.** A script promotes the surviving candidates to findings and checks every field.
-7. **File.** The findings go to the tracker you chose, with a "Before you fix" block, and are read back.
+7. **File.** The findings go to the tracker you chose, with a "Before you fix" block, and are read back. If you did not allow automatic filing, you see the dry-run list first and `crucible approve` gives the go.
+8. **Report.** `crucible report` lists every action taken, every action refused or skipped, coverage N of M and tokens spent.
+
+Two things run beside the pipeline. A **blocker** (a missing tool, a failing command, a tracker without a field or label, a token without a scope) can be fixed with your permission: `crucible blocker`, `crucible fix`; a backup comes first and the blocked stage must pass again. Product findings are filed, never fixed. **Knowledge** from outside this machine (issues, docs sites, wikis, exports) can be fetched read-only with `crucible knowledge fetch` and absorbed into permanent memory. Backups of anything that can be lost are on by default.
 
 ## The engine
 
@@ -35,8 +38,10 @@ crucible/
 ├── SKILL.md              trigger, interview, pipeline, guarantees
 ├── agents/               reader and verifier briefs
 ├── references/
-│   ├── interview.md      the 11 questions
-│   ├── memory.md         permanent memory
+│   ├── interview.md      the questions, defaults and config keys
+│   ├── permissions.md    groups, grants, action log, backups
+│   ├── blockers.md       blocker fixes
+│   ├── memory.md         permanent memory and knowledge flow
 │   ├── method.md         the nine method rules
 │   └── finding-schema.md the finding and verdict shapes
 ├── scripts/              engine and tests
@@ -58,5 +63,7 @@ Or as a Claude Code plugin: `/plugin marketplace add NoMercyLabs/skills`, then `
 **A script accepts, never a report.** A reader's "I read everything" is checked against stamps only the engine can make. A verifier's "this is real" is checked for quoted lines that exist.
 
 **Coverage is a count.** "Found nothing" means nothing without N of M from the ledger.
+
+**Every permission is asked first.** Each group of outward actions has its own yes or no, bounds the engine enforces, and a log line for every action.
 
 **Nothing leaves the machine by default.** The tracker is the one place findings go, and the user chooses it.
