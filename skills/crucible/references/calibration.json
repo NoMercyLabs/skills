@@ -1,0 +1,125 @@
+{
+ "tiers": {
+  "balanced": {
+   "start_tokens": 872240,
+   "tokens_per_line": 0.0,
+   "turn_tokens": 4000,
+   "lines_per_turn": 400,
+   "output_tokens": 15644,
+   "verifier_start_tokens": 1739124,
+   "verifier_tokens_per_candidate": 0,
+   "candidates_per_unit": 3,
+   "judge_call_tokens": 4000,
+   "main_session_tokens": 50000,
+   "spread": 0.1066,
+   "samples": 2,
+   "verifier_samples": 2
+  },
+  "fast": {
+   "start_tokens": 0,
+   "tokens_per_line": 4172.2931,
+   "turn_tokens": 4000,
+   "lines_per_turn": 400,
+   "output_tokens": 9425,
+   "verifier_start_tokens": 12000,
+   "verifier_tokens_per_candidate": 2500,
+   "candidates_per_unit": 3,
+   "judge_call_tokens": 4000,
+   "main_session_tokens": 50000,
+   "spread": 5.1553,
+   "samples": 2
+  }
+ },
+ "version": 1,
+ "runs": [
+  {
+   "source": "crucible-selftest-run2-haiku",
+   "stage": "pilot",
+   "after_units": 2,
+   "roles": [
+    "reader",
+    "verifier"
+   ],
+   "forecast": 3214698,
+   "actual": 3214698,
+   "forecast_error": 0.0
+  },
+  {
+   "source": "crucible-selftest-run2",
+   "stage": "pilot",
+   "after_units": 2,
+   "roles": [
+    "reader",
+    "verifier"
+   ],
+   "forecast": 5362016,
+   "actual": 5362016,
+   "forecast_error": 0.0
+  }
+ ],
+ "selftest": {
+  "balanced": {
+   "recall": "12 of 12",
+   "found": 12,
+   "seeded": 12,
+   "known_extras_found": 6,
+   "invented": 0,
+   "coverage_percent": 100,
+   "cost_tokens": 5362016,
+   "forecast_error": 0.0,
+   "selftest": "SELFTEST PASS"
+  },
+  "fast": {
+   "recall": "0 of 12",
+   "found": 0,
+   "seeded": 12,
+   "known_extras_found": 0,
+   "invented": 0,
+   "coverage_percent": 0,
+   "cost_tokens": 3214698,
+   "forecast_error": 0.0,
+   "selftest": "SELFTEST FAIL: found 0 of 12, at least 10 needed; coverage 0%"
+  }
+ },
+ "first_try": {
+  "note": "Before the pilot refit fired on recorded verifier usage, the forecast error was this. The verifier default (about 39k tokens) was far below the measured use (over 1M).",
+  "forecast_error": {
+   "balanced": -0.5181,
+   "fast": -0.4215
+  },
+  "terms_before": {
+   "balanced": {
+    "start_tokens": 872240,
+    "tokens_per_line": 0.0,
+    "turn_tokens": 4000,
+    "lines_per_turn": 400,
+    "output_tokens": 15644,
+    "verifier_start_tokens": 12000,
+    "verifier_tokens_per_candidate": 2500,
+    "candidates_per_unit": 3,
+    "judge_call_tokens": 4000,
+    "main_session_tokens": 50000,
+    "spread": 0.1066,
+    "samples": 2
+   },
+   "fast": {
+    "start_tokens": 0,
+    "tokens_per_line": 4172.2931,
+    "turn_tokens": 4000,
+    "lines_per_turn": 400,
+    "output_tokens": 9425,
+    "verifier_start_tokens": 12000,
+    "verifier_tokens_per_candidate": 2500,
+    "candidates_per_unit": 3,
+    "judge_call_tokens": 4000,
+    "main_session_tokens": 50000,
+    "spread": 5.1553,
+    "samples": 2
+   }
+  }
+ },
+ "notes": [
+  "The fixture has 2 units, so the pilot covers every unit and forecast_error 0.0 does not prove the forecast.",
+  "The fast tier is measured on the same fixture: its readers did not produce findings that pass the gate, so its recall is as listed; the balanced tier is the default reader."
+ ]
+}
