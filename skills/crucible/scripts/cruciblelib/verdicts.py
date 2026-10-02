@@ -14,7 +14,7 @@ CHECKED = re.compile(r"^(?:(?P<pin>[\w.-]+@[0-9a-f]{6,40}):)?(?P<path>[^\s:]+?):
                      r"(?:\s*\(.*\))?$")
 VERDICTS = ("accept", "reject", "fix")
 LEAD_VERDICTS = ("real", "cleared")
-ADDABLE = {"before_you_fix", "labels", "not_checked", "siblings"}
+ADDABLE = {"before_you_fix", "labels", "not_checked", "siblings", "verified_links", "visibility"}
 
 
 def cand_source(unit, cand):
