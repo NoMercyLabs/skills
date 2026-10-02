@@ -52,6 +52,7 @@ Every call is an argument list, never a shell string. `test_safety.py` allows `s
 | `cruciblelib/trackers/github.py` | `gh repo view`, `gh project view`, `gh auth status`, `gh label create`, `gh issue create`, `gh issue view`, `gh project item-add`, `gh api` (security advisories) | filing and its checks |
 | `cruciblelib/clones.py` | `git clone --quiet --no-hardlinks` | `workspace clone`, only inside the `workspace_clones` grant (no grant, no folder and no process) |
 | `cruciblelib/clones.py` | `git ls-remote --symref SOURCE HEAD` | `workspace`, a read-only query of a remote source's default branch, only inside the `workspace_clones` grant (no grant: the branch shows as unknown and no process starts) |
+| `cruciblelib/blockers.py` | the `change` and `proof` commands of a fix plan the user approved, as an argument list from `shlex`, never a shell | `fix run`, only after the `blocker_fixes` grant and its mode check; every command is written to `actions.log` |
 
 ## Text from the audited code
 

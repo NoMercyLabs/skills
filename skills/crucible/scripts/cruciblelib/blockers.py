@@ -144,7 +144,7 @@ def cmd_fix_plan(args):
 
 def run_command(argv, repo):
     try:
-        done = subprocess.run(argv, cwd=repo, capture_output=True, text=True, timeout=COMMAND_TIMEOUT)
+        done = subprocess.run([*argv], cwd=repo, capture_output=True, text=True, timeout=COMMAND_TIMEOUT)
     except (OSError, subprocess.SubprocessError) as exc:
         return 1, f"{type(exc).__name__}: {exc}"
     return done.returncode, (done.stdout + done.stderr).strip()[-500:]

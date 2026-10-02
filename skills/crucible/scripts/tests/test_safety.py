@@ -18,7 +18,8 @@ BLOB_MODULES = {"base64", "binascii", "marshal", "pickle", "zlib", "codecs"}
 # Only these files may reach the network or start a process; each is a documented adapter (SECURITY.md).
 NETWORK_ALLOWED = ("cruciblelib/trackers/", "cruciblelib/knowledge")
 SUBPROCESS_ALLOWED = ("cruciblelib/config.py", "cruciblelib/safety.py", "cruciblelib/trackers/github.py",
-                      "cruciblelib/knowledge", "cruciblelib/clones.py")
+                      "cruciblelib/knowledge", "cruciblelib/clones.py",
+                      "cruciblelib/blockers.py")
 NETWORK_COMMANDS_ALLOWED = ("cruciblelib/clones.py", "cruciblelib/trackers/github.py")
 GIT_NETWORK_VERBS = {"clone", "fetch", "ls-remote", "pull", "push"}
 CREDENTIAL_PATHS = re.compile(
