@@ -12,6 +12,7 @@ from .trackers import github
 from .visibility import repo_slug
 
 GROUP = "blocker_fixes"
+INTEGRATION = "crucible/audit-fixes"
 STATUSES = ("open", "fixed", "fixed-local", "failed")
 COMMAND_TIMEOUT = 600
 
@@ -196,25 +197,58 @@ def fix_branch(row, plan):
     return branch
 
 
+def git_step(repo, *args):
+    code, text = run_command(["git", "-C", repo, *args], repo)
+    if code != 0:
+        raise CrucibleError(f"git {args[0]} failed: {text}")
+    return text
+
+
+def fix_base(root, repo):
+    """The branch every fix branches from: the checkout at the first fix, then kept so later fixes start from it too."""
+    path = root.p("fix_base.json")
+    saved = read_json(path)
+    if saved:
+        return saved["base"]
+    base = git_step(repo, "rev-parse", "--abbrev-ref", "HEAD")
+    if base == "HEAD":
+        base = git_step(repo, "rev-parse", "HEAD")
+    write_json(path, {"base": base, "at": now()})
+    return base
+
+
 def commit_fix(root, row, plan, repo, branch):
-    """Commit the touched files on the fix branch, as the user's own git config says; the checkout stays on it."""
+    """Commit the touched files on a fix branch cut from the base, as the user's own git config says, so the fix
+    branch (and its pull request) holds only this fix."""
     files = [touch_path(t) for t in plan["touches"] if os.path.isfile(os.path.join(repo, *touch_path(t).split("/")))]
     title = f"fix({row['stage'] or 'audit'}): {row['id']} {row['description']}"
-
-    def step(*args):
-        code, text = run_command(["git", "-C", repo, *args], repo)
-        if code != 0:
-            raise CrucibleError(f"git {args[0]} failed: {text}")
 
     def action():
         if not files:
             raise CrucibleError("the plan touches no file the fix can commit")
-        step("checkout", "-b", branch)
-        step("add", "--", *files)
-        step("commit", "-q", "-m", title, "--", *files)
+        git_step(repo, "checkout", "-b", branch, fix_base(root, repo))
+        git_step(repo, "add", "--", *files)
+        git_step(repo, "commit", "-q", "-m", title, "--", *files)
         return run_command(["git", "-C", repo, "rev-parse", "--short", "HEAD"], repo)[1]
 
     return run_action(root, GROUP, f"commit {row['id']}", action)
+
+
+def merge_fix(root, row, repo, branch):
+    """Merge the fix branch into the local-only integration branch, which stays checked out so later stages see
+    every proven fix; nothing here touches a remote."""
+    def action():
+        if run_command(["git", "-C", repo, "rev-parse", "--verify", "-q", f"refs/heads/{INTEGRATION}"], repo)[0] != 0:
+            git_step(repo, "checkout", "-b", INTEGRATION)
+            return f"created {INTEGRATION} at {branch}"
+        git_step(repo, "checkout", INTEGRATION)
+        code, text = run_command(["git", "-C", repo, "merge", "--no-edit", branch], repo)
+        if code != 0:
+            run_command(["git", "-C", repo, "merge", "--abort"], repo)
+            raise CrucibleError(f"git merge failed: {text}")
+        return f"merged {branch} into {INTEGRATION}"
+
+    return run_action(root, GROUP, f"merge {row['id']}", action)
 
 
 def open_pull_request(root, row, repo, branch):
@@ -233,6 +267,8 @@ def land(root, row, plan, repo):
     try:
         branch = fix_branch(row, plan)
         commit_fix(root, row, plan, repo, branch)
+        stage = "merge"
+        merge_fix(root, row, repo, branch)
         if plan["landing"] == "local_branch":
             return ""
         stage = "push"

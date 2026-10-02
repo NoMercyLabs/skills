@@ -56,7 +56,7 @@ Every call is an argument list, never a shell string. `test_safety.py` allows `s
 | `cruciblelib/clones.py` | `git clone --quiet --no-hardlinks`, for a `git:URL` knowledge source | `knowledge fetch`, only inside the `knowledge_clone` grant and its `sources` bound, after the `knowledge_sources` grant (no grant, no folder and no process); the clone sits in a scratch folder and is removed after the read |
 | `cruciblelib/clones.py` | `git push --quiet origin BRANCH` | `fix run`, only inside the `blocker_pushes` grant, after the fix passed its proof and was committed locally (no grant: no push, the blocker stays `fixed-local`) |
 | `cruciblelib/clones.py` | `git ls-remote --symref SOURCE HEAD` | `workspace`, a read-only query of a remote source's default branch, only inside the `workspace_clones` grant (no grant: the branch shows as unknown and no process starts) |
-| `cruciblelib/blockers.py` | the `change` and `proof` commands of a fix plan the user approved, as an argument list from `shlex`, never a shell | `fix run`, only after the `blocker_fixes` grant and its mode check; every command is written to `actions.log`; the local `git checkout -b`, `add` and `commit` of the fixed files run inside the same grant |
+| `cruciblelib/blockers.py` | the `change` and `proof` commands of a fix plan the user approved, as an argument list from `shlex`, never a shell | `fix run`, only after the `blocker_fixes` grant and its mode check; every command is written to `actions.log`; the local `git checkout`, `add`, `commit` and `merge` (into the local-only `crucible/audit-fixes`) of the fixed files run inside the same grant |
 
 ## Text from the audited code
 
