@@ -94,6 +94,20 @@ Rules for the main session while the pipeline runs:
 - A unit with any file unread is `partial`, never `done`. Resume it; do not round it up.
 - Report coverage only as "N of M" from `crucible status`. "Found nothing" without the ledger is not a result.
 
+## Beside the pipeline
+
+Each line is one command and the grant it needs (`crucible grant GROUP yes|no --words "..."`). A missing or `no` grant refuses the command.
+
+- **Repeats.** `crucible repeats --transcripts DIR [--repo REPO] [--min N]` lists shell commands the user's agents repeat. Grant: `transcripts`, bounded to the repos.
+- **Tokens.** `crucible tokens [--calibration PATH]` prints the estimate with start cost and turns. Grant: none.
+- **Calibrate.** `crucible calibrate --transcript FILE --role reader|verifier|judge|main [--unit UNIT] [--refit]` records an agent's real usage and refits the terms. Grant: none; it reads only the transcript you name.
+- **Knowledge.** `crucible knowledge fetch NAME` and `crucible knowledge list`. Grant: `knowledge_sources` (a `git` source also needs `knowledge_clone`).
+- **Board.** `crucible board propose` writes the plan; after the user's go, `crucible approve HASH`, then `crucible board apply`. Grant: `tracker_board`.
+- **Costs.** `crucible costs [--transcripts DIR] [--repo REPO] [--user-file FILE]` measures where tokens go. Grants: `transcripts`; `user_instructions` for `--user-file`. `crucible costs move --repo R --file F --heading H` moves one section to an on-demand file after a backup; run it only after the user says yes. Grant: none.
+- **Learn (lessons).** `crucible learn propose [--transcripts DIR]`, then `crucible learn apply ID --yes` (add `--dry-run` first), `crucible learn list|review`, `crucible learn revert ID`. Grant: `transcripts` only for `--transcripts`.
+- **Heal.** There is no command. A stage failure is classified from measured facts, a known class gets one scripted recovery, a unit that fails twice in one class is blocked, and a refusal is never healed. Every heal is in `actions.log` and in `crucible report`. Grant: none.
+- **Shareback.** `crucible shareback enable --words "..."`, then `crucible shareback offer ID` and `crucible shareback yes|no ID`. Off by default. It only drafts issue text for the user to send; it sends nothing. Grant: none.
+
 ## Method rules
 
 `references/method.md` holds the nine rules for how to treat an issue: no guesses, cause before symptom, siblings, research before the fix, a failing test first, done means proven on every instance, facts from scripts, coverage as N of M, and a correction is a process defect. Each rule names its script check, or says "prose only". Every reader, verifier and filed issue carries them. Read the file before the first reader is dispatched.
