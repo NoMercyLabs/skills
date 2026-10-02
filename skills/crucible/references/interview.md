@@ -15,7 +15,7 @@ python scripts/crucible.py --root ROOT next
 
 `VALUE` is JSON or a plain string. `KEY` is a dotted config key, named in each question below. The engine stores the answer and the user's words in `config.answers`, and refuses an unknown top-level key. `crucible next` prints the next unanswered key. After the last interview key come the permission groups (see `permissions.md`). Then run `crucible summary`, show the whole output, and run `crucible confirm` only after the user says yes. `confirm` refuses, and lists what is missing, until the memory choice, the filing choice, the blocker-fix choice and every permission group are answered.
 
-Order: scope, goals, stages, tracker, auto_file, advisories, owners, privacy_words, budget, models, live_checks, blocker_fixes, backups, memory, knowledge_sources, then the permission groups.
+Order: scope, goals, stages, tracker, auto_file, advisories, owners, privacy_words, budget, models, live_checks, blocker_fixes, backups, memory, knowledge_sources, then the permission groups. Two more answers are asked before filing: `visibility` (confirm each repo and board with `crucible visibility confirm SLUG public|private --words`, after `crucible visibility detect`) and `private_destination` (`advisory`, `private_repo` or `local_report`).
 
 ## 1. Scope
 

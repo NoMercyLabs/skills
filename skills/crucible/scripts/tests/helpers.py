@@ -7,7 +7,8 @@ import tempfile
 import unittest
 
 from cruciblelib import cli
-from cruciblelib.common import source_id
+from cruciblelib.common import Root, source_id
+from cruciblelib.visibility import required_slugs
 from cruciblelib.permissions import GROUPS
 
 
@@ -66,6 +67,18 @@ class CrucibleCase(unittest.TestCase):
             self.assertEqual(code, 0, err)
         for group in GROUPS:
             code, out, err = run(root, "grant", group, "no", "--words", "test default")
+            self.assertEqual(code, 0, err)
+        self.answer_visibility(root)
+
+    def answer_visibility(self, root, value="private", pointers="false", destination='{"kind": "local_report"}'):
+        """The public/private questions: every repo and board confirmed, the yes/no flags, the private destination."""
+        for flag in ("public_board_items", "collaborators_see_security"):
+            self.assertEqual(run(root, "answer", f"visibility.{flag}", "false", "--words", "test default")[0], 0)
+        self.assertEqual(run(root, "answer", "visibility.pointers", pointers, "--words", "test default")[0], 0)
+        if destination:
+            self.assertEqual(run(root, "answer", "private_destination", destination, "--words", "test default")[0], 0)
+        for slug in required_slugs(Root(root).config()):
+            code, out, err = run(root, "visibility", "confirm", slug, value, "--words", "test default")
             self.assertEqual(code, 0, err)
 
     def make_inventoried(self, files, config=None):
@@ -144,7 +157,7 @@ def good_finding(title="Handler reads its token path unchecked", **over):
         "how": {"reproduce": ["unset X", "start the app"], "fix": "use os.environ.get with a message",
                 "prove": "a test starting without X"},
         "evidence": [{"kind": "file_line", "ref": "app.py:2", "quote": "TOKEN_PATH = os.environ['X']"}],
-        "siblings": ["searched: os.environ[, 0 more"], "not_checked": [], "labels": [],
+        "siblings": ["searched: os.environ[, 0 more"], "not_checked": [], "labels": [], "visibility": "public",
     }
     finding.update(over)
     return finding

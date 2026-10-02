@@ -35,6 +35,8 @@ If the user does not accept the first point, stop. Do not read a file.
 | `blocker_fixes` | which blockers, how a fix lands, which systems may change live (see `blockers.md`) |
 | `knowledge_sources` | each named source, read-only, and where its text is written |
 
+Filing never puts a private finding in a public place: `crucible visibility list` shows what the user confirmed, and `file --apply` reads each repo's visibility again before every write.
+
 ## Commands
 
 ```sh

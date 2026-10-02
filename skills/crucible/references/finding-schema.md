@@ -24,6 +24,7 @@
 | `siblings` | list | paths, or `searched: <query>, 0 more` |
 | `not_checked` | list | every claim not opened or run; `[]` when none |
 | `labels` | list | strings the tracker adapter maps |
+| `visibility` | string | `public` or `private`; an exploitable finding is `private` and the gate refuses it otherwise |
 | `before_you_fix` | object | `current_behaviour`, `callers`, `consumers`, `earlier_fixes`, `instances` |
 
 No field is empty. The text `not checked` is allowed. Placeholder text (`TBD`, `?`, `n/a`, `...`, `-`) is not.

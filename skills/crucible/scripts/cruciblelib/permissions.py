@@ -285,6 +285,11 @@ def cmd_report(args):
     counts, _ = coverage_counts(root)
     print(coverage_line(counts))
     print(tokens_line(cfg, state))
+    from .filing import counts
+    by_visibility, by_destination = counts(root)
+    if by_visibility:
+        print("filed by visibility: " + ", ".join(f"{k} {v}" for k, v in sorted(by_visibility.items())))
+        print("filed by destination: " + ", ".join(f"{k} {v}" for k, v in sorted(by_destination.items())))
     absorbed, missed = knowledge_lines(state)
     if absorbed or missed:
         print("knowledge sources absorbed: " + str(len(absorbed)))

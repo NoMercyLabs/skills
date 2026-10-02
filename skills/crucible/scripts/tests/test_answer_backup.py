@@ -43,7 +43,8 @@ class AnswerTests(CrucibleCase):
         self.assertEqual(INTERVIEW_ORDER[:15], (
             "scope", "goals", "stages", "tracker", "auto_file", "advisories", "owners", "privacy_words",
             "budget", "models", "live_checks", "blocker_fixes", "backups", "memory", "knowledge_sources"))
-        self.assertEqual(INTERVIEW_ORDER[15:], tuple("permissions." + g for g in GROUPS))
+        self.assertEqual(INTERVIEW_ORDER[15:17], ("visibility", "private_destination"))
+        self.assertEqual(INTERVIEW_ORDER[17:], tuple("permissions." + g for g in GROUPS))
 
     def test_next_walks_to_the_end(self):
         root = self.fresh()
@@ -61,6 +62,10 @@ class AnswerTests(CrucibleCase):
                 run(root, "answer", out, '{"mode": "each"}', "--words", "test")
             elif out == "memory":
                 run(root, "answer", out, '{"kind": "none"}', "--words", "test")
+            elif out == "visibility":
+                self.answer_visibility(root, destination=None)
+            elif out == "private_destination":
+                run(root, "answer", out, '{"kind": "local_report"}', "--words", "test")
             else:
                 run(root, "answer", out, "[]", "--words", "test")
         self.assertEqual(tuple(seen), INTERVIEW_ORDER)
