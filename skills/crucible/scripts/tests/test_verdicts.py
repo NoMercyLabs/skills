@@ -103,6 +103,26 @@ class VerdictCheckTests(CrucibleCase):
         self.assertEqual(code, 0, out)
         self.assertNotIn("no field", out)
 
+    def test_verdict_links_checked_by_gate(self):
+        def accept(links):
+            a = good_finding(root_cause_verified=True)
+            a["not_checked"] = []
+            a.pop("verified_links", None)
+            fix = {"verified_links": links}
+            checked = ["app.py:2", "app.py:3"]
+            root, unit = self.prepared_unit([a], {src(UNIT, a): verdict("fix", fix=fix, checked=checked)})
+            code, out, err = run(root, "accept", unit)
+            return code, out + err
+
+        code, out = accept(["app.py:2"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("verified_links does not list every link", out)
+        code, out = accept(["app.py:3", "app.py:2", "gone.py:9"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("gone.py:9", out)
+        code, out = accept(["app.py:3", "app.py:2"])
+        self.assertEqual(code, 0, out)
+
     def test_verdict_check_reads_extra_verdict_files(self):
         a, b = good_finding(), good_finding(title="Second handler problem here")
         root, unit = self.prepared_unit([a, b], {src(UNIT, a): verdict()})
