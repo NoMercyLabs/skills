@@ -6,7 +6,7 @@ Crucible works for the person who runs it. This file lists everything the skill 
 
 - No telemetry, analytics or phone-home. Nothing is sent to the publisher.
 - No `eval`, `exec`, `os.system`, `shell=True`, dynamic import or encoded blob in the code.
-- No download, no package install, no `curl | sh`. Python standard library only.
+- No package install and no `curl | sh`. Python standard library only. The only things fetched are the clones under the `workspace_clones` and `knowledge_clone` grants and the reads under the `knowledge_sources` grant (see Network calls).
 - It never asks for a password, token or key. A secret pasted into the chat is not used or stored; revoke it.
 - It never reads the credential folders of the machine: SSH, cloud CLIs, keychains, browser data, shell history.
 - It never opens a secret file of a repo: `.env*` (the `.example`, `.sample`, `.template` and `.dist` templates are plain text and stay readable), `*.pem`, `*.key`, `id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519` (not `.pub`), `*.p12`, `*.pfx`, and JSON whose name holds `credentials`, `client_secret` or `service_account`. Inventory skips them, so no unit and no snapshot holds one, and `show` and the snapshot reader refuse them by name. `crucible safety` lists the secret files that git tracks, by path only.
@@ -33,7 +33,7 @@ Crucible works for the person who runs it. This file lists everything the skill 
 
 ## Network calls
 
-The Python code opens no socket and imports no network module. The only outward path is the `gh` command, started by `scripts/cruciblelib/trackers/github.py` when findings are filed:
+The engine opens no network socket of its own, and each outward path sits behind a named grant (`workspace_clones`, `knowledge_clone`, `blocker_pushes`, `blocker_fixes`, `knowledge_sources`). The only outward paths are the `gh` command (started by `scripts/cruciblelib/trackers/github.py`, behind the tracker, `blocker_fixes` and `knowledge_sources` grants), the `git` network commands (started by `scripts/cruciblelib/clones.py`, behind the `workspace_clones`, `knowledge_clone` and `blocker_pushes` grants), and one HTTPS read of a granted `url` source in `scripts/cruciblelib/knowledge.py` (the `knowledge_sources` grant). Filing is the main `gh` use:
 
 - Only after the user answered the interview, granted the group, approved a dry run of the exact plan, and confirmed that the destination is private or public.
 - Only to the repos, labels, assignees and board the user named. Every action is checked against the grant and written to `actions.log` with secrets masked.

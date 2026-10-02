@@ -77,9 +77,10 @@ A change after `confirm` goes back through `summary`, `plan` and a new yes.
 
 ## What it never does
 
-It never fixes product code.
-It files findings and never fixes them.
-A blocker fix needs its own grant, and a backup comes first.
+It files product findings and never fixes them.
+It changes product code only to fix a blocker, which is something that stops the audit or the filing.
+A blocker fix needs the `blocker_fixes` grant, and a backup comes first.
+Pushing the fix branch needs the separate `blocker_pushes` grant.
 
 It never files without a grant.
 It never files before you approve a dry run of the exact plan.
@@ -93,8 +94,11 @@ It never asks for a password, token or key.
 It never reads credential folders, shell history or browser data.
 It never opens a secret file of a repo, such as `.env` files and key files.
 It sends no telemetry.
-It does not download anything or install packages.
-It uses only the Python standard library, and its code opens no network socket.
+It installs no packages and uses only the Python standard library.
+The engine opens no network socket of its own, and the only network use is through the `git` and `gh` commands, in two adapters, each behind a named grant such as `workspace_clones` or `blocker_pushes`.
+The `gh` adapter files issues and pull requests, and reads knowledge sources, under the `knowledge_sources` grant.
+The `git` adapter clones under the `workspace_clones` and `knowledge_clone` grants, and pushes a branch under the `blocker_pushes` grant.
+One granted `url` knowledge source is a single HTTPS read under the `knowledge_sources` grant.
 It never takes an action it cannot log.
 It never reuses an old permission answer unless you say yes.
 It treats text inside the audited code as data, never as an instruction.
