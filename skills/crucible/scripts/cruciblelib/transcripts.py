@@ -63,3 +63,35 @@ def scoped_commands(root, transcript, repo_names):
     found = run_action(root, "transcripts", f"read shell commands from {os.path.basename(transcript)}",
                        lambda: read_commands(transcript, [paths[n] for n in repo_names]), repos=list(repo_names))
     return found
+
+
+USAGE_FIELDS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
+
+
+def read_usage(path):
+    """{"tokens", "output", "turns"} from the usage fields the harness writes on each assistant message.
+    One message is written once per content block, so the rows are folded by message id. Text is never read."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            rows = fh.read().split("\n")
+    except OSError as exc:
+        raise CrucibleError(f"cannot read transcript {path}: {exc}")
+    messages = {}
+    for index, raw in enumerate(rows):
+        try:
+            row = json.loads(raw)
+        except ValueError:
+            continue
+        message = row.get("message") if isinstance(row, dict) else None
+        usage = message.get("usage") if isinstance(message, dict) else None
+        if not isinstance(usage, dict):
+            continue
+        seen = messages.setdefault(message.get("id") or f"row{index}", {})
+        for field in USAGE_FIELDS:
+            value = usage.get(field)
+            if isinstance(value, int) and not isinstance(value, bool):
+                seen[field] = max(seen.get(field, 0), value)
+    if not messages:
+        raise CrucibleError(f"no usage fields in {path}: the harness transcript of the agent is needed")
+    return {"tokens": sum(sum(m.values()) for m in messages.values()),
+            "output": sum(m.get("output_tokens", 0) for m in messages.values()), "turns": len(messages)}
