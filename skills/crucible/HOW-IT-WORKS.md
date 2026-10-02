@@ -116,6 +116,7 @@ Balanced tier:
 - Invented findings: 0.
 - Coverage: 100 percent.
 - Cost: 5,362,016 tokens.
+- Cost by usage field: input 148, cache write 341,954, cache read 4,950,263, output 69,651, total 5,362,016 tokens.
 - Forecast error: 0.0.
 - Result: SELFTEST PASS.
 
@@ -125,12 +126,17 @@ Fast tier:
 - Invented findings: 0.
 - Coverage: 0 percent.
 - Cost: 3,214,698 tokens.
+- Cost by usage field: input 354, cache write 240,155, cache read 2,938,170, output 36,019, total 3,214,698 tokens.
 - Forecast error: 0.0.
 - Result: SELFTEST FAIL, because the readers produced no findings that pass the gate.
 
 The balanced reader is the default for this reason.
 The fast tier found 0 of 12 on the same fixture.
 The fast tier is cheaper, but it fails the gate.
+
+The four usage fields are not priced alike.
+Cache reads are the largest field here and cost far less per token than output.
+Read the total with the split beside it.
 
 The fixture has 2 units.
 The pilot therefore covers every unit.

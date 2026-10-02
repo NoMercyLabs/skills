@@ -66,6 +66,13 @@
    "invented": 0,
    "coverage_percent": 100,
    "cost_tokens": 5362016,
+   "cost_split": {
+    "input": 148,
+    "cache_write": 341954,
+    "cache_read": 4950263,
+    "output": 69651,
+    "total": 5362016
+   },
    "forecast_error": 0.0,
    "selftest": "SELFTEST PASS"
   },
@@ -77,6 +84,13 @@
    "invented": 0,
    "coverage_percent": 0,
    "cost_tokens": 3214698,
+   "cost_split": {
+    "input": 354,
+    "cache_write": 240155,
+    "cache_read": 2938170,
+    "output": 36019,
+    "total": 3214698
+   },
    "forecast_error": 0.0,
    "selftest": "SELFTEST FAIL: found 0 of 12, at least 10 needed; coverage 0%"
   }
