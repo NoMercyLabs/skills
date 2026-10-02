@@ -7,6 +7,7 @@ from cruciblelib.common import Root
 
 from .helpers import CrucibleCase, run
 from .test_blockers import BlockerCase
+from .test_board_apply import BoardApplyCase
 from .test_costs import RELEASE, RULES
 from .test_knowledge import KnowledgeCase
 from .test_lessons import PASSED, SHAPE, LessonCase
@@ -97,3 +98,17 @@ class EveryWorkspaceCloneIsLoggedTests(SystemCase):
         new = actions(root)[before:]
         self.assertTrue(any(row["group"] == "workspace_clones" and row["command"].startswith("clone 1 repos into")
                             and row["status"] == "ok" and "svc" in row["result"] for row in new), new)
+
+
+class EveryBoardApplyIsLoggedTests(BoardApplyCase):
+    def test_log_every_write_board_apply_logs_each_field_it_creates(self):
+        root = self.board_ready()
+        self.approved_plan(root)
+        before = len(actions(root))
+        code, out, err = run(root, "board", "apply")
+        self.assertEqual(code, 0, out + err)
+        new = [row for row in actions(root)[before:] if row["group"] == "tracker_board" and row["status"] == "ok"]
+        created = [row for row in new if row["command"].startswith("create field ")]
+        self.assertEqual(len(created), len([c for c in self.gh.calls if c[:2] == ["project", "field-create"]]))
+        self.assertTrue(created)
+        self.assertTrue([row for row in new if row["command"].startswith("create view ")])
