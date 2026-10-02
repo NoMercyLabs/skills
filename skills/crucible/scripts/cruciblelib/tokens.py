@@ -3,7 +3,7 @@ import os
 
 from .common import CrucibleError, Root, read_json, write_json
 from .models import JUDGE_CALL_TOKENS, TIERS, plan_for
-from .transcripts import read_usage
+from .transcripts import SPLIT_NAMES, read_usage
 
 PILOT_UNITS = 3
 REFIT_EVERY = 10
@@ -200,6 +200,19 @@ def ensure_first_estimate(root, plan, tiers, ledger):
         write_json(ledger_path(root), ledger)
 
 
+def cost_split(records):
+    """Sum of each usage field over the records, with the total, or None when a record has no split (an older ledger)."""
+    if not records or any("split" not in r for r in records):
+        return None
+    found = {name: sum(r["split"][name] for r in records) for name in SPLIT_NAMES.values()}
+    return dict(found, total=sum(found.values()))
+
+
+def split_text(found):
+    return (f"cost split: input {found['input']}, cache write {found['cache_write']}, cache read {found['cache_read']}, "
+            f"output {found['output']}, total {found['total']}")
+
+
 def is_complete(plan, records):
     read = {r["unit"] for r in records if r["role"] == "reader"}
     return bool(plan["units"]) and all(u["unit"] in read for u in plan["units"])
@@ -254,7 +267,8 @@ def cmd_calibrate(args):
         next(iter(plan["complex_jobs"].values()))["tier"])
     record = {"role": args.role, "unit": unit and unit["unit"], "tier": tier, "lines": unit["lines"] if unit else 0,
               "candidates": args.candidates, "calls": args.calls, "turns": usage["turns"],
-              "tokens": usage["tokens"], "output": usage["output"], "transcript": os.path.basename(args.transcript)}
+              "tokens": usage["tokens"], "output": usage["output"], "split": usage["split"],
+              "transcript": os.path.basename(args.transcript)}
     old = [r for r in ledger["records"] if r["role"] == args.role and (r["unit"] == record["unit"] or unit is None)]
     ledger["records"] = [r for r in ledger["records"] if r not in old] + [record]
     state = root.state()
@@ -284,6 +298,9 @@ def cmd_calibrate(args):
     found = summary(project(plan, tiers, ledger["records"]))
     print(f"recorded {args.role} {record['unit'] or ''}: {record['tokens']} tokens from the harness transcript, "
           f"{record['turns']} turns".replace("  ", " "))
+    split = cost_split(ledger["records"])
+    if split:
+        print(split_text(split))
     print(forecast_text(found))
     if over_cap(root, found["high"]):
         print(stop_line(root, found["high"]))

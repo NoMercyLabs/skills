@@ -66,10 +66,12 @@ def scoped_commands(root, transcript, repo_names):
 
 
 USAGE_FIELDS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
+SPLIT_NAMES = {"input_tokens": "input", "cache_creation_input_tokens": "cache_write", "cache_read_input_tokens": "cache_read",
+               "output_tokens": "output"}
 
 
 def read_usage(path):
-    """{"tokens", "output", "turns"} from the usage fields the harness writes on each assistant message.
+    """{"tokens", "output", "turns", "split"} (split: the sum of each usage field) from the usage fields the harness writes on each assistant message.
     One message is written once per content block, so the rows are folded by message id. Text is never read."""
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
@@ -94,4 +96,5 @@ def read_usage(path):
     if not messages:
         raise CrucibleError(f"no usage fields in {path}: the harness transcript of the agent is needed")
     return {"tokens": sum(sum(m.values()) for m in messages.values()),
-            "output": sum(m.get("output_tokens", 0) for m in messages.values()), "turns": len(messages)}
+            "output": sum(m.get("output_tokens", 0) for m in messages.values()), "turns": len(messages),
+            "split": {name: sum(m.get(field, 0) for m in messages.values()) for field, name in SPLIT_NAMES.items()}}
