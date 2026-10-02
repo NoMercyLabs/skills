@@ -75,7 +75,7 @@ class Grant(CostsCase):
     def test_the_user_wide_file_needs_its_own_grant(self):
         root, path, repo = self.setup_audit()
         user = os.path.join(self.tmp(), "CLAUDE.md")
-        with open(user, "w", encoding="utf-8") as fh:
+        with open(user, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(USER_FILE)
         folder = self.folder(self.session(repo))
         with self.assertRaises(CrucibleError):
@@ -130,7 +130,7 @@ class Instructions(CostsCase):
     def test_the_user_wide_file_counts_when_granted(self):
         root, path, repo = self.setup_audit()
         user = os.path.join(self.tmp(), "CLAUDE.md")
-        with open(user, "w", encoding="utf-8") as fh:
+        with open(user, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(USER_FILE)
         run(path, "grant", "user_instructions", "yes", "--words", "test", "--bound", f"targets={user}", "--reopen")
         found = find_costs(root, self.folder(self.session(repo)), ["svc"], user_file=user)
@@ -163,12 +163,14 @@ class Proposals(CostsCase):
     def test_the_command_prints_the_proposals_and_changes_nothing(self):
         root, path, repo = self.setup_audit()
         folder = self.folder(self.session(repo))
-        before = open(os.path.join(repo, "CLAUDE.md"), encoding="utf-8").read()
+        with open(os.path.join(repo, "CLAUDE.md"), encoding="utf-8") as fh:
+            before = fh.read()
         code, out, err = run(path, "costs", "--transcripts", folder)
         self.assertEqual(code, 0, err)
         self.assertIn("Release steps", out)
         self.assertIn("tokens per session", out)
-        self.assertEqual(open(os.path.join(repo, "CLAUDE.md"), encoding="utf-8").read(), before)
+        with open(os.path.join(repo, "CLAUDE.md"), encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), before)
 
 
 class Moving(CostsCase):
