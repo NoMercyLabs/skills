@@ -6,6 +6,7 @@ from cruciblelib import lessons
 from cruciblelib.common import Root
 
 from .helpers import CrucibleCase, run
+from .test_blockers import BlockerCase
 from .test_costs import RELEASE, RULES
 from .test_knowledge import KnowledgeCase
 from .test_lessons import PASSED, SHAPE, LessonCase
@@ -66,3 +67,16 @@ class EveryLessonApplyIsLoggedTests(LessonCase):
         new = actions(root)[before:]
         self.assertTrue(any(row["command"] == f"learn apply {lesson['id']}" and row["status"] == "ok"
                             and "CLAUDE.md" in row["result"] for row in new), new)
+
+
+class EveryFixRunIsLoggedTests(BlockerCase):
+    def test_log_every_write_fix_run_logs_the_outcome_of_the_change(self):
+        self.allow()
+        blocker = self.planned()
+        before = len(actions(self.root))
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.lib_text(), "FIXED")
+        new = actions(self.root)[before:]
+        self.assertTrue(any(row["command"] == f"fix run {blocker}" and row["status"] == "ok"
+                            and row["result"].startswith("fixed") for row in new), new)
