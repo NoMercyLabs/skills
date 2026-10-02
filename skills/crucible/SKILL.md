@@ -71,10 +71,14 @@ Run in this order. Each command ends in a file on disk. Commands marked "refuses
 | 11 | `crucible file --dry-run`, then (when `auto_file` is false) `crucible approve PLAN_HASH`, then `crucible file --apply`, then `crucible file --verify` | `--apply` without a dry run of the same plan, without approval when it is required, outside the granted bounds, or config not confirmed |
 | 12 | `crucible report` | |
 
-Two more command groups run beside the pipeline:/n/n- **Blockers.** When a stage cannot go on: `crucible blocker add DESCRIPTION [--stage S]`, `crucible blocker list`, `crucible fix plan BLOCKER_ID`, `crucible fix run BLOCKER_ID [--yes-words ".."]`. A fix needs the `blocker_fixes` grant, makes a backup first, and re-runs the blocked stage, which must pass. See `references/blockers.md`.
+Two more command groups run beside the pipeline:
+
+- **Blockers.** When a stage cannot go on: `crucible blocker add DESCRIPTION [--stage S]`, `crucible blocker list`, `crucible fix plan BLOCKER_ID`, `crucible fix run BLOCKER_ID [--yes-words ".."]`. A fix needs the `blocker_fixes` grant, makes a backup first, and re-runs the blocked stage, which must pass. See `references/blockers.md`.
 - **Knowledge.** `crucible knowledge fetch SOURCE_NAME` pulls a granted outside source into `ROOT/knowledge/SOURCE_NAME/` as Markdown, to be absorbed by Grimoira's `index-docs --from`. See `references/memory.md`.
 
 For a system of several repos: `crucible layout` says single repo, monorepo or a folder of repos; `crucible related` lists the repos the code points to with file:line; `crucible workspace plan|choose|clone` reads them from your own checkouts or a fresh read-only base folder (`workspace_clones` grant, `references/interview.md` 10e); `crucible graph` writes the edges between repos with file:line evidence and hands each reader the leads of its unit.
+
+`crucible explore FILE:LINE` prints the callers, callees, input sources, config and environment names, git history, earlier fixes and siblings of the code at that line, each with file:line; readers and verifiers run it for every candidate.
 
 `crucible safety` lists the secret files git tracks, by path only; run it at the start and tell the user. `SECURITY.md` lists every file read or written, every network call and every subprocess.
 

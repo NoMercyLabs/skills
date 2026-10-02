@@ -26,6 +26,7 @@ Rules for what is a finding:
 - Style, naming taste, "could be cleaner", a missing test on its own, and a TODO comment on its own are not findings.
 - An old pinned version is not a finding on its own. A version that breaks a real setup is.
 - Trace a claim through the callers before you call it a defect. A guard two calls up makes it not a defect.
+- For every candidate, run `python scripts/crucible.py --root ROOT explore FILE:LINE` on its main evidence line. It prints the callers, callees, where the inputs come from, the config and environment names read and where they are set, the git history of the lines, earlier fixes on them, and siblings, each with file:line. Follow the callers that matter with more `explore` runs. Name the runs you made and what you did not follow; "not checked" is allowed, a guess is not.
 - When unsure whether it is real, leave it out of the candidates and keep it as a lead.
 - Zero findings for a unit is a fine result.
 - Anything the user's scope or goals say is by design is not a finding.

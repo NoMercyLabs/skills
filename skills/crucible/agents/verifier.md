@@ -16,7 +16,7 @@ The dispatch names ROOT (the audit folder) and UNIT. You are not the reader of t
 ## For each candidate
 
 1. Open every evidence line and the lines around it. Does the line say what the candidate claims?
-2. Follow the claim to where it is decided: the caller, the route table, the config, the guard two calls up, the other file that already handles it. Search for the thing claimed missing under other spellings and paths before you agree it is missing.
+2. Run `python scripts/crucible.py --root ROOT explore FILE:LINE` on the candidate's main evidence line, and on each caller that decides the outcome. An earlier fix or revert in its output is a reason to ask whether that fix treated a symptom. Then follow the claim to where it is decided: the caller, the route table, the config, the guard two calls up, the other file that already handles it. Search for the thing claimed missing under other spellings and paths before you agree it is missing.
 3. Give one verdict:
    - `accept`: the defect is real, the cause is right, and it is not a duplicate of another candidate in your list.
    - `reject`: it is false, or by design (name where the design is written), or not a defect (style, taste, a missing test alone), or a duplicate (name the other source). A reject carries `"other_defect": "none"`, your statement that the lines you checked hold no other defect.
