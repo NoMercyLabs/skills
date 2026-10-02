@@ -47,6 +47,18 @@ class AnswerTests(CrucibleCase):
         self.assertEqual(INTERVIEW_ORDER[17:18], ("workspace",))
         self.assertEqual(INTERVIEW_ORDER[18:], tuple("permissions." + g for g in GROUPS))
 
+    def test_next_asks_the_fable_question_right_after_models(self):
+        root = self.fresh()
+        for key in ("scope", "goals", "stages", "tracker", "auto_file", "advisories", "owners", "privacy_words",
+                    "budget"):
+            value = "true" if key == "auto_file" else "[]"
+            self.assertEqual(run(root, "answer", key, value, "--words", "ok")[0], 0)
+        self.assertEqual(run(root, "next")[1].strip(), "models")
+        self.assertEqual(run(root, "answer", "models", "{}", "--words", "ok")[0], 0)
+        self.assertEqual(run(root, "next")[1].strip(), "models.fable")
+        self.assertEqual(run(root, "answer", "models.fable", "no", "--words", "no top tier")[0], 0)
+        self.assertEqual(run(root, "next")[1].strip(), "live_checks")
+
     def test_next_walks_to_the_end(self):
         root = self.fresh()
         seen = []
@@ -57,6 +69,8 @@ class AnswerTests(CrucibleCase):
             seen.append(out)
             if out.startswith("permissions."):
                 self.assertEqual(run(root, "grant", out.split(".", 1)[1], "no", "--words", "test")[0], 0)
+            elif out == "models.fable":
+                run(root, "answer", out, "no", "--words", "test")
             elif out == "auto_file":
                 run(root, "answer", out, "true", "--words", "test")
             elif out == "blocker_fixes":
@@ -71,7 +85,8 @@ class AnswerTests(CrucibleCase):
                 run(root, "answer", out, '{"kind": "local_report"}', "--words", "test")
             else:
                 run(root, "answer", out, "[]", "--words", "test")
-        self.assertEqual(tuple(seen), INTERVIEW_ORDER)
+        at = INTERVIEW_ORDER.index("models") + 1
+        self.assertEqual(tuple(seen), INTERVIEW_ORDER[:at] + ("models.fable",) + INTERVIEW_ORDER[at:])
 
     def test_answer_records_the_users_words(self):
         root = self.fresh()
