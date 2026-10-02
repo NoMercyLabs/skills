@@ -253,6 +253,38 @@ class FixBranchTests(BlockerCase):
         self.assertTrue(any(r["command"] == f"merge {second}" and r["status"] == "ok" for r in self.log()))
 
 
+    def test_proof_runs_on_fix_branch_alone(self):
+        self.allow(landing="local_branch")
+        first = self.planned()
+        alone = (f'{PY} -c "import sys; sys.exit(0 if open(\'app.py\').read() == \'FIXED2\' '
+                 f'and open(\'lib.py\').read() != \'FIXED\' else 1)"')
+        second = self.planned(root_cause="app.py:1", touch="app.py", test="test_start=app.py:1", change=CHANGE_APP,
+                              proof=alone)
+        self.assertEqual(run(self.root, "fix", "run", first)[0], 0)
+        self.assertEqual(git(self.repo, "rev-parse", "--abbrev-ref", "HEAD"), "crucible/audit-fixes")
+        code, out, err = run(self.root, "fix", "run", second)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.read(self.root, "blockers.json")[1]["status"], "fixed")
+        self.assertEqual(git(self.repo, "show", "crucible/fix-b-002:lib.py"), git(self.repo, "show", f"{self.base}:lib.py"))
+
+    def test_merge_conflict_keeps_fixed_local(self):
+        self.allow(landing="local_branch")
+        first = self.planned()
+        other = f'{PY} -c "open(\'lib.py\', \'w\').write(\'FIXED-B\')"'
+        other_proof = f'{PY} -c "import sys; sys.exit(0 if open(\'lib.py\').read() == \'FIXED-B\' else 1)"'
+        second = self.planned(change=other, proof=other_proof)
+        self.assertEqual(run(self.root, "fix", "run", first)[0], 0)
+        before = git(self.repo, "rev-parse", "crucible/audit-fixes")
+        code, out, err = run(self.root, "fix", "run", second)
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(self.read(self.root, "blockers.json")[1]["status"], "fixed-local")
+        self.assertIn(f"conflicts with {first}", out + err)
+        self.assertEqual(git(self.repo, "rev-parse", "crucible/audit-fixes"), before)
+        self.assertEqual(git(self.repo, "status", "--porcelain"), "")
+        self.assertEqual(git(self.repo, "show", "crucible/audit-fixes:lib.py"), "FIXED")
+        self.assertEqual(git(self.repo, "show", "crucible/fix-b-002:lib.py"), "FIXED-B")
+
+
 class FixPlanRefusalTests(BlockerCase):
     def refused(self, text, **over):
         blocker = self.add()

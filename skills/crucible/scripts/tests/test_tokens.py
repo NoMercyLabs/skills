@@ -118,6 +118,32 @@ class TokenTests(CrucibleCase):
         first = ledger["first_estimate"]["units"][units[3]["unit"]]
         self.assertEqual(first, 2 * tokens.reader_tokens(tokens.terms_by_tier({})[tier], units[3]["lines"]))
 
+    def test_refit_not_double_scaled_any_tier(self):
+        root, units = self.setup_audit()
+        plan = plan_for(Root(root))
+        tiers = tokens.terms_by_tier({})
+        records = []
+        for tier in tokens.TIERS:
+            for lines in (100, 300):
+                records.append({"role": "reader", "tier": tier, "lines": lines, "turns": 2, "output": 1000,
+                                "tokens": 20000 + 30 * lines})
+            for candidates in (1, 3):
+                records.append({"role": "verifier", "tier": tier, "candidates": candidates,
+                                "tokens": 5000 + 700 * candidates})
+            records.append({"role": "judge", "tier": tier, "calls": 2, "tokens": 9000})
+            records.append({"role": "main", "tier": tier, "tokens": 31000})
+        fitted = dict(tiers, **tokens.fit_terms(tiers, records))
+        for tier in tokens.TIERS:
+            self.assertNotEqual(fitted[tier], tiers[tier])
+        plain = tokens.project(dict(plan, forecast_factor=1), fitted, [])
+        scaled = tokens.project(dict(plan, forecast_factor=2), fitted, [])
+        for role in tokens.ROLES:
+            with self.subTest(role=role):
+                self.assertGreater(plain[role]["left"], 0)
+                self.assertEqual(scaled[role]["left"], plain[role]["left"])
+        unfitted = tokens.project(dict(plan, forecast_factor=2), tiers, [])
+        self.assertEqual(unfitted["verifier"]["left"], 2 * tokens.project(dict(plan, forecast_factor=1), tiers, [])["verifier"]["left"])
+
     def test_estimate_includes_start_cost_and_turns(self):
         root, units = self.setup_audit()
         terms = flat_terms(start_tokens=1000, tokens_per_line=10, turn_tokens=500, lines_per_turn=100,
