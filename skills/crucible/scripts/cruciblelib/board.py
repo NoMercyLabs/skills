@@ -9,15 +9,19 @@ from collections import Counter
 
 from . import blockers, rootcause
 from . import visibility as vis
+from .backup import backup
 from .common import CrucibleError, Root, read_json, write_json
 from .config import git
-from .permissions import record_dryrun, refuse
+from .permissions import authorize, log_action, record_dryrun, refuse, run_action
+from .trackers import get_adapter
 
 BLOCKERS_STAGE = "Blockers"
 CAUSES_STAGE = "Root causes that unblock other findings"
 UNASSIGNED = "unassigned"
 DATES_QUESTION = "Put dates on the stages? This needs your team speed; dates from estimates drift."
 CODEOWNERS_PATHS = ("CODEOWNERS", ".github/CODEOWNERS", "docs/CODEOWNERS")
+ITEM_VALUES = {"Area": "area", "Stage": "stage", "Severity": "severity", "Priority": "priority",
+               "Size": "size", "Owner": "owner"}
 
 
 def build_areas(root, cfg):
@@ -293,7 +297,110 @@ def cmd_propose(args):
           "on the board before that")
 
 
+def board_ref(cfg):
+    owner, _, number = vis.board_key(cfg)[len("board:"):].partition("/")
+    return owner, number
+
+
+def find_field(fields, name):
+    return next((f for f in fields if f["name"].lower() == name.lower()), None)
+
+
+def item_key(name):
+    """The key gh gives a field in `item-list` output: the first word lower case, the others capitalized."""
+    first, *rest = name.split()
+    return first.lower() + "".join(w.capitalize() for w in rest)
+
+
+def cmd_apply(args):
+    root = Root(args.root)
+    root.require_confirmed()
+    cfg = root.config()
+    if not vis.board_key(cfg):
+        raise CrucibleError("no board is configured: tracker.kind is not github-project")
+    require_approved_plan(root, cfg)
+    plan = read_json(plan_path(root))
+    owner, number = board_ref(cfg)
+    repos = [vis.tracker_slug(cfg) or owner]
+    authorize(root, "tracker_board", "board apply", repos=repos)
+    adapter = get_adapter("github", root, cfg)
+    live = adapter.list_fields(owner, number)
+    missing = [f for f in plan["fields"] if not find_field(live, f["name"])]
+    if missing:
+        saved = backup(root, f"board-{owner}-{number}", json.dumps(
+            {"fields": live, "items": adapter.list_items(owner, number)}, indent=2, ensure_ascii=False))
+        print(f"board backed up before any change: {saved or 'backups are off'}")
+    for field in missing:
+        options = [str(v["value"]) for v in field["values"]] or None
+        run_action(root, "tracker_board", f"create field {field['name']} on board:{owner}/{number}",
+                   lambda f=field, o=options: adapter.create_field(owner, number, f["name"], o)["id"], repos=repos)
+        print(f"field created: {field['name']}")
+    for field in plan["fields"]:
+        if field not in missing:
+            print(f"field kept: {find_field(live, field['name'])['name']}")
+            if field["add_values"]:
+                print(f"options not added to {field['name']}: gh has no command to add options to an existing "
+                      f"field; add by hand: {', '.join(map(str, field['add_values']))}")
+    for view in plan["views"]:
+        print(f"view not created: gh has no command: {view['name']} (group by {view['group_by']}"
+              + (f", where {view['filter']}" if view["filter"] else "") + "); create it on the board page")
+        log_action(root, "tracker_board", f"view {view['name']}", "gh has no command to create a view", "skipped")
+
+
+def set_item_fields(root, cfg, adapter, fid, ref, repos, state):
+    """Set the planned values on one filed item; -> {board field name: value} for the read-back at verify."""
+    plan = read_json(plan_path(root))
+    owner, number = board_ref(cfg)
+    if not state:
+        state.update(fields=adapter.list_fields(owner, number), project=adapter.project_id(owner, number))
+    item = next((i for i in adapter.list_items(owner, number) if (i.get("content") or {}).get("url") == ref), None)
+    if item is None:
+        raise CrucibleError(f"{ref} is not on the board yet")
+    written = {}
+    for field in plan["fields"]:
+        key = ITEM_VALUES.get(field["name"])
+        if not key:
+            continue
+        live = find_field(state["fields"], field["name"])
+        if not live:
+            raise CrucibleError(f"the board has no field {field['name']}: run `crucible board apply` first")
+        value = str(plan["items"][fid][key])
+        run_action(root, "tracker_board", f"set {live['name']} on {ref}",
+                   lambda f=live, v=value: adapter.set_item_field(state["project"], item["id"], f, v), repos=repos)
+        written[live["name"]] = value
+    return written
+
+
+def read_back_problems(adapter, rows):
+    """Compare the written field values of each (key, filed row) with what the board holds now."""
+    problems, boards = [], {}
+    for key, row in rows:
+        if row["board"] not in boards:
+            owner, _, number = row["board"][len("board:"):].partition("/")
+            try:
+                boards[row["board"]] = {(i.get("content") or {}).get("url"): i
+                                        for i in adapter.list_items(owner, number)}
+            except CrucibleError as exc:
+                boards[row["board"]] = exc
+        found = boards[row["board"]]
+        if isinstance(found, CrucibleError):
+            problems.append(f"{key}: cannot read the board back: {found}")
+        elif row["ref"] not in found:
+            problems.append(f"{key}: not on the board {row['board']}")
+        else:
+            for name, want in sorted(row["board_fields"].items()):
+                got = found[row["ref"]].get(item_key(name))
+                if str(got) != want:
+                    problems.append(f"{key}: board field {name} is {got!r}, it was set to {want!r}")
+    return problems
+
+
+def cmd_board(args):
+    return cmd_propose(args) if args.action == "propose" else cmd_apply(args)
+
+
 def register(sub):
-    p = sub.add_parser("board", help="propose the board from the research")
-    p.add_argument("action", choices=("propose",), help="propose: write board/plan.json and print it")
-    p.set_defaults(func=cmd_propose)
+    p = sub.add_parser("board", help="propose the board from the research, or apply the approved plan")
+    p.add_argument("action", choices=("propose", "apply"),
+                   help="propose: write board/plan.json and print it; apply: create or map its fields")
+    p.set_defaults(func=cmd_board)

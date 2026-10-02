@@ -36,8 +36,7 @@ class BoardGh(FakeGh):
     def __call__(self, args, stdin=None):
         head = args[:2]
         if head == ["project", "view"]:
-            self.calls.append(list(args))
-            return json.dumps({"id": "PVT_1", "public": False})
+            return json.dumps({**json.loads(super().__call__(args, stdin)), "id": "PVT_1"})
         if head == ["project", "field-list"]:
             self.calls.append(list(args))
             return json.dumps({"fields": self.fields, "totalCount": len(self.fields)})

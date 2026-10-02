@@ -30,6 +30,23 @@ class Tracker:
         """-> {'title': str, 'body': str} exactly as stored."""
         raise NotImplementedError
 
+    def project_id(self, owner, number):
+        raise NotImplementedError
+
+    def list_fields(self, owner, number):
+        """The board's fields as the tracker reports them: id, name, and options for a single-select field."""
+        raise NotImplementedError
+
+    def create_field(self, owner, number, name, options):
+        """A single-select field with these options, or a date field when options is None."""
+        raise NotImplementedError
+
+    def list_items(self, owner, number):
+        raise NotImplementedError
+
+    def set_item_field(self, project_id, item_id, field, value):
+        raise NotImplementedError
+
 
 def text_digest(title, body):
     return hashlib.sha256((title + "\n" + body).encode("utf-8")).hexdigest()[:16]

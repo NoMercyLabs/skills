@@ -1,11 +1,13 @@
 import json
 import os
+from unittest import mock
 
 from cruciblelib.common import Root
 from cruciblelib.filing import POINTER_BODY, POINTER_TITLE, build_plan, recheck_visibility
 from cruciblelib.trackers import github
 
 from .helpers import CrucibleCase, good_finding, run
+from .test_board_apply import BoardGh
 from .test_filing import FILES, PRIVATE_SUMMARY, PRIVATE_TITLE, PUBLIC_TITLE, FilingCase
 
 SECOND_TITLE = "Second handler also reads it unchecked"
@@ -118,6 +120,10 @@ class PlacementTests(FilingCase):
             recheck_visibility(Root(root), cfg, github.GitHub(), action)
 
     def test_private_never_on_public_board(self):
+        self.gh = BoardGh()
+        patcher = mock.patch.object(github, "run_gh", self.gh)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.gh.boards[("acme", "7")] = "public"
         findings = [dict(f, root_cause_verified=True) for f in (self.private(), self.finding(1))]
         root = self.ready(findings, auto="true", tracker=BOARD,
@@ -136,6 +142,7 @@ class PlacementTests(FilingCase):
         self.assertEqual(run(root, "board", "propose")[0], 0)
         with open(os.path.join(root, "board", "plan.json"), encoding="utf-8") as fh:
             self.assertEqual(run(root, "approve", json.load(fh)["hash"])[0], 0)
+        self.assertEqual(run(root, "board", "apply")[0], 0)
         self.filed_everything(root)
         urls = [u for _, u in self.gh.board_items]
         self.assertTrue(urls)

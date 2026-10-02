@@ -206,6 +206,7 @@ def cmd_apply(root):
         authorize(root, group, f"apply plan {digest}", repos=sorted(set(repos)), count=count)
     get = adapters(root, cfg)
     filed = read_json(root.p("filed.json"), {})
+    board_state = {}
     done = 0
     for action in actions:
         if action["key"] in filed:
@@ -229,12 +230,16 @@ def cmd_apply(root):
             if action["board"]:
                 run_action(root, "tracker_board", f"add {ref} to {action['board']}",
                            lambda a=action, r=ref: adapter.add_to_board(a, r), repos=[target])
+                board_fields = board.set_item_fields(root, cfg, adapter, action["finding"], ref, [target],
+                                                     board_state)
         stored = adapter.read(action["kind"], action["target"], ref)
         filed[action["key"]] = {"kind": action["kind"], "finding": action["finding"], "target": action["target"],
                                 "ref": ref, "destination": action["destination"],
                                 "visibility": action["visibility"],
                                 "digest": text_digest(action["title"], action["body"]),
                                 "stored_digest": text_digest(stored["title"], stored["body"])}
+        if action["kind"] != "markdown" and action["board"]:
+            filed[action["key"]].update(board=action["board"], board_fields=board_fields)
         write_json(root.p("filed.json"), filed)
         done += 1
         print(f"filed {action['kind']} {action['finding']} -> {action['target']}: {ref}")
@@ -272,6 +277,9 @@ def cmd_verify(root):
             problems.append(f"{key}: a private finding sits in a public destination ({row['target']})")
         if live == "public":
             public_texts.append((key, row["kind"], read["title"] + "\n" + read["body"]))
+    on_board = [(key, row) for key, row in sorted(filed.items()) if row.get("board_fields")]
+    if on_board:
+        problems += board.read_back_problems(get("issue"), on_board)
     for key, kind, text in public_texts:
         lowered = text.lower()
         for fid, f in sorted(private_findings.items()):

@@ -77,6 +77,35 @@ class GitHub(Tracker):
         owner, _, number = action["board"][len("board:"):].partition("/")
         run_gh(["project", "item-add", number, "--owner", owner, "--url", ref])
 
+    def project_id(self, owner, number):
+        return json.loads(run_gh(["project", "view", str(number), "--owner", owner, "--format", "json"]))["id"]
+
+    def list_fields(self, owner, number):
+        out = run_gh(["project", "field-list", str(number), "--owner", owner, "--format", "json", "-L", "100"])
+        return json.loads(out)["fields"]
+
+    def create_field(self, owner, number, name, options):
+        args = ["project", "field-create", str(number), "--owner", owner, "--name", name, "--format", "json"]
+        if options is None:
+            return json.loads(run_gh(args + ["--data-type", "DATE"]))
+        # the flag is a comma-split list that reads CSV quoting, so a value with a comma is quoted
+        quoted = ['"' + o.replace('"', '""') + '"' if "," in o or '"' in o else o for o in options]
+        return json.loads(run_gh(args + ["--data-type", "SINGLE_SELECT", "--single-select-options", ",".join(quoted)]))
+
+    def list_items(self, owner, number):
+        out = run_gh(["project", "item-list", str(number), "--owner", owner, "--format", "json", "-L", "1000"])
+        return json.loads(out)["items"]
+
+    def set_item_field(self, project_id, item_id, field, value):
+        args = ["project", "item-edit", "--id", item_id, "--project-id", project_id, "--field-id", field["id"]]
+        if "options" not in field:
+            run_gh(args + ["--text", value])
+            return
+        option = next((o for o in field["options"] if o["name"] == value), None)
+        if option is None:
+            raise CrucibleError(f"the board field {field['name']} has no option {value!r}")
+        run_gh(args + ["--single-select-option-id", option["id"]])
+
     def read(self, kind, target, ref):
         if kind == "advisory":
             data = json.loads(run_gh(["api", f"repos/{target}/security-advisories/{ref}"]))
