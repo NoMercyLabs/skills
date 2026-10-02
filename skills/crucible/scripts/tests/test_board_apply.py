@@ -32,9 +32,34 @@ class BoardGh(FakeGh):
         self.items = []
         self.backups = backups or (lambda: [])
         self.backups_at_create = []
+        self.views = []
+        self.view_writes = []
+
+    def graphql(self, args, stdin):
+        """The GraphQL calls of the views: create, update the filter, list. The request body comes on stdin."""
+        self.calls.append(list(args))
+        body = json.loads(stdin)
+        query, variables = body["query"], body.get("variables", {})
+        if "createProjectV2View" in query:
+            self.view_writes.append(body)
+            data = variables["input"]
+            view = {"id": f"PVV_{len(self.views) + 1}", "name": data["name"], "layout": data["layout"], "filter": "",
+                    "configuration": data.get("configuration")}
+            self.views.append(view)
+            return json.dumps({"data": {"createProjectV2View": {"projectV2View": view}}})
+        if "updateProjectV2View" in query:
+            self.view_writes.append(body)
+            data = variables["input"]
+            view = next(v for v in self.views if v["id"] == data["viewId"])
+            view["filter"] = data["filter"]
+            return json.dumps({"data": {"updateProjectV2View": {"projectV2View": view}}})
+        return json.dumps({"data": {"node": {"views": {"nodes": [
+            {k: v[k] for k in ("id", "name", "layout", "filter")} for v in self.views]}}}})
 
     def __call__(self, args, stdin=None):
         head = args[:2]
+        if head == ["api", "graphql"]:
+            return self.graphql(args, stdin)
         if head == ["project", "view"]:
             return json.dumps({**json.loads(super().__call__(args, stdin)), "id": "PVT_1"})
         if head == ["project", "field-list"]:
@@ -68,7 +93,7 @@ class BoardGh(FakeGh):
         return super().__call__(args, stdin)
 
     def writes(self):
-        return [c for c in self.calls if c[:2] in WRITES]
+        return [c for c in self.calls if c[:2] in WRITES] + self.view_writes
 
 
 class BoardApplyCase(FilingCase):
@@ -124,8 +149,7 @@ class BoardApplyTests(BoardApplyCase):
         self.assertEqual({f["name"] for f in saved["fields"]}, {"Title", "Status", "stage"})
         self.assertIn("items", saved)
         self.assertIn(backup_file, [r["result"] for r in self.log_rows(root) if r["group"] == "backups"])
-        self.assertIn("view not created: gh has no command", out)
-        self.assertIn("Start here", out)
+        self.assertIn("view created: Start here", out)
 
     def test_item_fields_set_on_apply(self):
         root = self.board_ready()
@@ -171,3 +195,80 @@ class BoardApplyTests(BoardApplyCase):
         refused = [r for r in self.log_rows(root) if r["group"] == "tracker_board" and r["status"] == "refused"]
         self.assertGreaterEqual(len(refused), 2)
         self.assertEqual(Root(root).config()["permissions"]["tracker_board"]["answer"], "no")
+
+
+class BoardViewTests(BoardApplyCase):
+    def applied_views(self):
+        root = self.board_ready()
+        plan = self.approved_plan(root)
+        code, out, err = run(root, "board", "apply")
+        self.assertEqual(code, 0, out + err)
+        return root, plan, out
+
+    def test_views_created_under_grant(self):
+        root, plan, out = self.applied_views()
+        self.assertEqual([v["name"] for v in self.gh.views], [v["name"] for v in plan["views"]])
+        self.assertEqual({v["layout"] for v in self.gh.views} - {"BOARD_LAYOUT", "TABLE_LAYOUT", "ROADMAP_LAYOUT"}, set())
+        creates = [w for w in self.gh.view_writes if "createProjectV2View" in w["query"]]
+        self.assertEqual(len(creates), len(plan["views"]))
+        for write in creates:
+            data = write["variables"]["input"]
+            self.assertEqual(data["projectId"], "PVT_1")
+            self.assertEqual(set(data), {"projectId", "name", "layout", "configuration"})
+            self.assertEqual(set(data["configuration"]), {"visibleFieldIds"})
+            self.assertIn("F-Stage", data["configuration"]["visibleFieldIds"])
+        rows = [r for r in self.log_rows(root) if r["group"] == "tracker_board" and r["command"].startswith("create view")]
+        self.assertEqual(len(rows), len(plan["views"]))
+        self.assertTrue(all(r["status"] == "ok" for r in rows))
+        for view in plan["views"]:
+            self.assertIn(f"view created: {view['name']}", out)
+        denied = self.board_ready(grants={"tracker_board": None})
+        self.approved_plan(denied)
+        before = len(self.gh.view_writes)
+        code, out, err = run(denied, "board", "apply")
+        self.assertEqual(code, 1)
+        self.assertIn("refused", err)
+        self.assertEqual(len(self.gh.view_writes), before)
+
+    def test_view_filter_set_by_update(self):
+        root, plan, out = self.applied_views()
+        start = plan["views"][0]
+        stage = start["filter"].split(" = ", 1)[1]
+        updates = [w["variables"]["input"] for w in self.gh.view_writes if "updateProjectV2View" in w["query"]]
+        self.assertEqual(len(updates), 1, "only the view with a filter is updated")
+        self.assertEqual(updates[0]["filter"], f'stage:"{stage}"')
+        self.assertEqual(updates[0]["viewId"], self.gh.views[0]["id"])
+        self.assertEqual(set(updates[0]), {"viewId", "filter"})
+        for write in self.gh.view_writes:
+            if "createProjectV2View" in write["query"]:
+                self.assertNotIn("filter", write["variables"]["input"])
+        self.assertEqual(self.gh.views[0]["filter"], f'stage:"{stage}"')
+        self.assertIn("view filter set: Start here", out)
+
+    def test_view_grouping_listed_for_user(self):
+        root, plan, out = self.applied_views()
+        for view in plan["views"]:
+            self.assertIn(f"view {view['name']}: group by {view['group_by']} cannot be set through the API; "
+                          "set it on the board page", out)
+        for write in self.gh.view_writes:
+            self.assertNotIn("groupBy", json.dumps(write))
+            self.assertNotIn("sortBy", json.dumps(write))
+
+    def test_verify_reads_views_back(self):
+        root = self.board_ready()
+        self.applied_board(root)
+        code, out, err = run(root, "file", "--verify")
+        self.assertEqual(code, 0, out + err)
+        listed = len([c for c in self.gh.calls if c[:2] == ["api", "graphql"]])
+        self.assertGreater(listed, len(self.gh.view_writes), "verify lists the views")
+        self.gh.views[0]["filter"] = "stage:other"
+        code, out, err = run(root, "file", "--verify")
+        self.assertEqual(code, 1)
+        self.assertIn("VERIFY FAIL", out)
+        self.assertIn("view Start here", out)
+        self.assertIn("filter", out)
+        self.gh.views[0]["filter"] = 'stage:"x"'
+        gone = self.gh.views.pop(1)
+        code, out, err = run(root, "file", "--verify")
+        self.assertEqual(code, 1)
+        self.assertIn(f"view {gone['name']} is not on the board", out)
