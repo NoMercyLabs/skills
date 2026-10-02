@@ -6,7 +6,7 @@ import io
 import re
 from types import SimpleNamespace
 
-from . import blockers, split
+from . import blockers, lessons, split
 from .common import CrucibleError, read_json, write_json
 from .permissions import log_action, now
 
@@ -19,6 +19,7 @@ TOOL_REFUSED = re.compile(r"(tool|permission).{0,40}(refused|denied)|refused by 
 CONTEXT_TEXT = re.compile(r"context (length|window)|prompt is too long", re.I)
 STUB_PROMPT = "call your first real tool now"
 SCOPE_HINT = "refresh the tracker token with the missing scope, then run the stage again"
+DEFAULT_ACTIONS = {"context_exhausted": "split_unit", "stub_reply": "resend_prompt", "rate_limited": "resume_after_wait"}
 LOG_STATUS = {"healed": "ok", "failed": "failed", "blocked": "failed", "refused": "refused", "reported": "skipped",
               "stopped": "skipped"}
 
@@ -63,13 +64,14 @@ def run_halves(root, unit, runner):
     return all(runner(part, **{}).get("ok") for part in root.state()["units"][unit]["parts"])
 
 
-def recovery(cls, root, unit, facts, runner):
-    """True when the scripted recovery made the unit run."""
-    if cls == "context_exhausted":
+def recovery(cls, root, unit, facts, runner, action=None):
+    """True when the scripted recovery made the unit run. A lesson's action replaces the class default."""
+    action = action or DEFAULT_ACTIONS.get(cls, "rerun_once")
+    if action == "split_unit":
         return run_halves(root, unit, runner)
-    if cls == "stub_reply":
+    if action == "resend_prompt":
         return bool(runner(unit, prompt_addendum=STUB_PROMPT).get("ok"))
-    if cls == "rate_limited":
+    if action == "resume_after_wait":
         return bool(runner(unit, wait=facts.get("retry_after", 0), resume=True).get("ok"))
     return bool(runner(unit).get("ok"))
 
@@ -93,14 +95,15 @@ def recover(root, unit, facts, runner):
         return {"class": cls, "unit": unit, "try": 0, "result": "none"}
     if cls == "tracker_scope":
         return {**record(root, cls, unit, 0, "stopped", SCOPE_HINT), "hint": SCOPE_HINT}
-    if cls in ("unknown", "tool_refused"):
+    action = lessons.recovery_for(root, facts.get("output"))
+    if cls == "tool_refused" or action == "report" or (cls == "unknown" and not action):
         return record(root, cls, unit, 0, "reported", detail)
     used = tries_used(root, cls, unit)
     if used >= MAX_TRIES:
         block(root, cls, unit, facts)
         return {"class": cls, "unit": unit, "try": used, "result": "blocked"}
     try:
-        ok = recovery(cls, root, unit, facts, runner)
+        ok = recovery(cls, root, unit, facts, runner, action)
     except CrucibleError as exc:
         ok, detail = False, str(exc)
     if ok:

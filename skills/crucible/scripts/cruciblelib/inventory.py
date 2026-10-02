@@ -106,7 +106,8 @@ def cmd_inventory(args):
     for folder in ("units", "snapshot"):
         if os.path.isdir(root.p(folder)):
             shutil.rmtree(root.p(folder))
-    unit_bytes = cfg.get("unit_bytes", DEFAULT_UNIT_BYTES)
+    from .lessons import sized_unit_bytes
+    unit_bytes = sized_unit_bytes(root, cfg)
     scope = cfg.get("scope", {})
     state["units"] = {}
     coverage = {"files": {}}
@@ -170,7 +171,8 @@ def cmd_estimate(args):
     units = [root.unit(n) for n in root.units() if state.get(n, {}).get("status") not in ("split", "carried")]
     lines = sum(u["lines"] for u in units)
     budget = cfg["budget"]
-    reader = lines * READER_TOKENS_PER_LINE
+    from .lessons import forecast_factor
+    reader = round(lines * READER_TOKENS_PER_LINE * forecast_factor(root))
     verifier = math.ceil(reader * VERIFIER_SHARE)
     tokens = reader + verifier
     print(f"units: {len(units)}")

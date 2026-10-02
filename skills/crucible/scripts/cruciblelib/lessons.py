@@ -16,6 +16,7 @@ import tempfile
 from . import selftest
 from .backup import backup
 from .common import CrucibleError, Root, has_key_like, read_json, write_json
+from .inventory import DEFAULT_UNIT_BYTES
 from .models import TIERS
 from .permissions import dryrun_hashes, log_action, now, read_log, record_dryrun, refuse
 from .repeats import MIN_RUNS, find_repeats, shape_of
@@ -25,6 +26,7 @@ MIN_OCCURRENCES = 3
 MEASURED_STATUSES = ("failed", "refused")
 STATES = ("proposed", "active", "applied", "reverted")
 TARGETS = ("audit", "workflow")
+RISK_CLASSES = ("low", "normal", "high")
 RECOVERIES = ("report", "rerun_once", "split_unit", "resend_prompt", "resume_after_wait")
 # The only keys a lesson may hold. Everything else is refused, so a lesson cannot reach a safety, permission,
 # privacy, visibility, root-cause or gate rule.
@@ -64,8 +66,8 @@ def check_change(change, target):
             raise CrucibleError("lesson refused: forecast_factor must be a number above 0")
         if key == "model_tier":
             tiers = [t for t in TIERS if t != "top"]
-            if not isinstance(value, dict) or any(not isinstance(k, str) or v not in tiers for k, v in value.items()):
-                raise CrucibleError(f"lesson refused: model_tier maps a risk class to one of {', '.join(tiers)}; "
+            if not isinstance(value, dict) or any(k not in RISK_CLASSES or v not in tiers for k, v in value.items()):
+                raise CrucibleError(f"lesson refused: model_tier maps a risk class ({', '.join(RISK_CLASSES)}) to one of {', '.join(tiers)}; "
                                     "the top tier is never set by a lesson")
         if key in ("reader_addendum", "instruction_line", "shape", "failure_signature"):
             if not isinstance(value, str) or not value.strip() or len(value) > 500 or "\n" in value.strip():
@@ -113,6 +115,41 @@ def reader_addenda(root):
     """The one-line addenda of the active audit lessons, in lesson id order; they go into each unit file."""
     return [x["change"]["reader_addendum"] for x in active(root)
             if x["target"] == "audit" and "reader_addendum" in x["change"]]
+
+
+def audit_values(root, key):
+    return [x["change"][key] for x in active(root) if x["target"] == "audit" and key in x["change"]]
+
+
+def sized_unit_bytes(root, cfg):
+    """The configured unit size, shrunk by the smallest unit_size_factor of the active lessons."""
+    base = cfg.get("unit_bytes", DEFAULT_UNIT_BYTES)
+    return max(1, int(base * min(audit_values(root, "unit_size_factor"), default=1)))
+
+
+def reader_tiers(root):
+    """risk class -> reader tier from the active lessons; a later lesson id wins."""
+    chosen = {}
+    for tiers in audit_values(root, "model_tier"):
+        chosen.update(tiers)
+    return chosen
+
+
+def forecast_factor(root):
+    factor = 1
+    for value in audit_values(root, "forecast_factor"):
+        factor *= value
+    return factor
+
+
+def recovery_for(root, output):
+    """The recovery of the first active lesson whose failure_signature appears in the failure output, or None."""
+    text = (output or "").casefold()
+    for lesson in active(root):
+        change = lesson["change"]
+        if lesson["target"] == "audit" and "failure_signature" in change and change["failure_signature"].casefold() in text:
+            return change["recovery"]
+    return None
 
 
 def occurrences(root):

@@ -46,12 +46,12 @@ def read_text(path):
         return fh.read().decode("utf-8", errors="replace")
 
 
-def scan_units(cfg):
+def scan_units(cfg, unit_bytes=None):
     """The units an inventory would make, without writing a snapshot: the model plan is asked before confirm."""
     units, scope = [], cfg.get("scope", {})
     for repo in cfg["repos"]:
         files = walk_text_files(repo["path"], scope.get("skip", []), scope.get("include", []))
-        for index, group in enumerate(pack(files, cfg.get("unit_bytes", DEFAULT_UNIT_BYTES)), 1):
+        for index, group in enumerate(pack(files, unit_bytes or cfg.get("unit_bytes", DEFAULT_UNIT_BYTES)), 1):
             items = [(rel, read_text(full)) for rel, full, size in group]
             units.append({"unit": f"{repo['name']}-u{index:02d}", "files": [rel for rel, text in items],
                           "lines": sum(len(split_lines(text.encode("utf-8"))) for rel, text in items),
@@ -72,7 +72,11 @@ def inventory_units(root):
 
 
 def load_units(root):
-    return inventory_units(root) if root.units() else scan_units(root.config())
+    if root.units():
+        return inventory_units(root)
+    from .lessons import sized_unit_bytes
+    cfg = root.config()
+    return scan_units(cfg, sized_unit_bytes(root, cfg))
 
 
 def fable_allowed(cfg):
@@ -89,21 +93,23 @@ def bulk_tier(tier):
     return "strong" if tier == "top" else tier
 
 
-def build_plan(cfg, units, fable):
+def build_plan(cfg, units, fable, reader_tiers=None, factor=1):
     chosen = cfg["models"]
     reader_tier = bulk_tier(chosen["reader"])
     for unit in units:
-        unit["reader_tier"] = LOW_TIER if unit["risk"] == "low" else reader_tier
+        unit["reader_tier"] = (reader_tiers or {}).get(unit["risk"]) or (
+            LOW_TIER if unit["risk"] == "low" else reader_tier)
     per_tier, tokens = {}, {}
     for unit in units:
         per_tier[unit["reader_tier"]] = per_tier.get(unit["reader_tier"], 0) + 1
-        tokens[unit["reader_tier"]] = tokens.get(unit["reader_tier"], 0) + unit["lines"] * READER_TOKENS_PER_LINE
+        tokens[unit["reader_tier"]] = (tokens.get(unit["reader_tier"], 0)
+                                       + round(unit["lines"] * READER_TOKENS_PER_LINE * factor))
     reader_tokens = sum(tokens.values())
     verifier_tokens = math.ceil(reader_tokens * VERIFIER_SHARE)
     verifier_tier = bulk_tier(chosen["verifier"])
     top_or_strong = "top" if fable else "strong"
     judge_tier = top_or_strong if chosen.get("judge", "strong") in ("strong", "top") else chosen["judge"]
-    jobs = {name: {"tier": judge_tier, "reason": reason, "calls": calls, "tokens": calls * JUDGE_CALL_TOKENS}
+    jobs = {name: {"tier": judge_tier, "reason": reason, "calls": calls, "tokens": round(calls * JUDGE_CALL_TOKENS * factor)}
             for name, (reason, calls) in COMPLEX_JOBS.items()}
     roles = {
         "reader": {"tier": reader_tier, "units_per_tier": per_tier, "tokens": reader_tokens,
@@ -123,13 +129,15 @@ def build_plan(cfg, units, fable):
     for job in jobs.values():
         amounts[job["tier"]] = amounts.get(job["tier"], 0) + job["tokens"]
     return {"fable": fable, "fable_answer": "yes" if fable else "no", "availability": "not checked",
-            "units": units, "roles": roles, "complex_jobs": jobs, "estimate": amounts,
+            "units": units, "forecast_factor": factor, "roles": roles, "complex_jobs": jobs, "estimate": amounts,
             "judgment_tokens": sum(job["tokens"] for job in jobs.values())}
 
 
 def plan_for(root, fable=None):
     cfg = root.config()
-    plan = build_plan(cfg, load_units(root), fable_allowed(cfg) if fable is None else fable)
+    from .lessons import forecast_factor, reader_tiers
+    plan = build_plan(cfg, load_units(root), fable_allowed(cfg) if fable is None else fable,
+                      reader_tiers(root), forecast_factor(root))
     plan["fable_answer"] = fable_answer(cfg)
     return plan
 

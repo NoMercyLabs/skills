@@ -119,9 +119,12 @@ def project(plan, tiers, records):
     done = {(r["role"], r.get("unit")): r for r in records}
     parts = {role: {"spent": 0, "left": 0, "margin": 0.0} for role in ROLES}
 
+    factor = plan.get("forecast_factor", 1)
+
     def add(role, tier, spent, estimate):
         part = parts[role]
         if spent is None:
+            estimate = round(estimate * factor)
             part["left"] += estimate
             part["margin"] += estimate * tiers[tier]["spread"]
         else:
@@ -184,7 +187,7 @@ def ensure_first_estimate(root, plan, tiers, ledger):
     if "first_estimate" not in ledger:
         parts = project(plan, tiers, [])
         ledger["first_estimate"] = {"parts": {role: p["total"] for role, p in parts.items()},
-                                    "units": {u["unit"]: reader_tokens(tiers[u["reader_tier"]], u["lines"])
+                                    "units": {u["unit"]: round(reader_tokens(tiers[u["reader_tier"]], u["lines"]) * plan.get("forecast_factor", 1))
                                               for u in plan["units"]}}
         write_json(ledger_path(root), ledger)
 
@@ -281,12 +284,13 @@ def cmd_calibrate(args):
 
 def print_estimate(plan, tiers):
     readers = [(tiers[u["reader_tier"]], u["lines"]) for u in plan["units"]]
+    factor = plan.get("forecast_factor", 1)
     parts = [reader_parts(terms, lines) for terms, lines in readers]
-    total = sum(reader_tokens(terms, lines) for terms, lines in readers)
-    print(f"reader tokens: {total} (start cost {round(sum(p['start'] for p in parts))}, "
-          f"lines {round(sum(p['lines'] for p in parts))}, "
-          f"turns {round(sum(p['turn_tokens'] for p in parts))} over {sum(p['turns'] for p in parts)} turns, "
-          f"output {round(sum(p['output'] for p in parts))})")
+    total = round(sum(reader_tokens(terms, lines) for terms, lines in readers) * factor)
+    print(f"reader tokens: {total} (start cost {round(sum(p['start'] for p in parts) * factor)}, "
+          f"lines {round(sum(p['lines'] for p in parts) * factor)}, "
+          f"turns {round(sum(p['turn_tokens'] for p in parts) * factor)} over {sum(p['turns'] for p in parts)} turns, "
+          f"output {round(sum(p['output'] for p in parts) * factor)})")
     estimate = project(plan, tiers, [])
     print(f"verifier tokens: {estimate['verifier']['total']} (start cost plus tokens per candidate)")
     print(f"judgment tokens: {estimate['judge']['total']}")
