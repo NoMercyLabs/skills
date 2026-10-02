@@ -1,7 +1,8 @@
 import json
 import os
+from unittest import mock
 
-from cruciblelib import knowledge
+from cruciblelib import clones, knowledge
 from cruciblelib.common import CrucibleError, Root
 
 from .helpers import CrucibleCase, run
@@ -171,13 +172,52 @@ class UnreachableTests(KnowledgeCase):
         self.assertIn("HTTP 404", out)
 
     def test_unreachable_kinds_never_touch_the_network(self):
-        for spec in ("url:http://plain.invalid/page", "git:https://host.invalid/a/b.git",
+        for spec in ("url:http://plain.invalid/page",
                      "folder:" + os.path.join(self.tmp(), "missing")):
             root = self.granted(spec)
             code, out, err = run(root, "knowledge", "fetch", spec)
             self.assertEqual(code, 1, spec)
             self.assertEqual(Root(root).state()["knowledge"][knowledge.source_name(spec)]["status"],
                              "unreachable", spec)
+
+    def fake_clone(self, calls):
+        def run_git(argv, **kwargs):
+            calls.append(argv)
+            dest = argv[-1]
+            os.makedirs(os.path.join(dest, ".git"))
+            with open(os.path.join(dest, ".git", "notes.txt"), "w", encoding="utf-8") as fh:
+                fh.write("internal\n")
+            with open(os.path.join(dest, "guide.md"), "w", encoding="utf-8") as fh:
+                fh.write("# guide\nrun it\n")
+            return mock.Mock(returncode=0, stdout="", stderr="")
+        return run_git
+
+    def test_knowledge_git_source_needs_grant(self):
+        spec = "git:https://host.invalid/a/b.git"
+        root = self.granted(spec)
+        calls = []
+        with mock.patch.object(clones.subprocess, "run", side_effect=self.fake_clone(calls)):
+            code, out, err = run(root, "knowledge", "fetch", spec)
+        self.assertEqual(code, 1)
+        self.assertIn("refused: knowledge_clone", err)
+        self.assertEqual(calls, [])
+        self.assertEqual(self.written(root, knowledge.source_name(spec)), {})
+        self.assertEqual(self.action_rows(root)[-1]["status"], "refused")
+
+    def test_knowledge_git_source_is_cloned_under_its_grant(self):
+        spec = "git:https://host.invalid/a/b.git"
+        root = self.granted(spec)
+        self.assertEqual(run(root, "grant", "knowledge_clone", "yes", "--reopen", "--words", "yes",
+                             "--bound", "sources=" + spec)[0], 0)
+        calls = []
+        with mock.patch.object(clones.subprocess, "run", side_effect=self.fake_clone(calls)):
+            code, out, err = run(root, "knowledge", "fetch", spec)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][:2], ["git", "clone"])
+        self.assertEqual(self.written(root, knowledge.source_name(spec)), {"guide.md": "# guide\nrun it\n"})
+        self.assertEqual(self.action_rows(root)[-1]["group"], "knowledge_sources")
+        self.assertIn("knowledge_clone", [r["group"] for r in self.action_rows(root)])
 
     def test_unknown_source_is_refused(self):
         root = self.granted()
