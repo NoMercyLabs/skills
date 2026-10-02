@@ -30,6 +30,8 @@ RECOVERIES = ("report", "rerun_once", "split_unit", "resend_prompt", "resume_aft
 # privacy, visibility, root-cause or gate rule.
 AUDIT_KEYS = ("unit_size_factor", "model_tier", "reader_addendum", "failure_signature", "recovery", "forecast_factor")
 WORKFLOW_KEYS = ("shape", "instruction_line")
+TEXT_KEYS = ("failure_signature", "reader_addendum")
+PROJECT_DETAIL = re.compile(r"[\\/@]|://|\.[a-z]{2,4}\b|\b\d{1,3}(?:\.\d{1,3}){3}\b|\b[a-z]+[A-Z]\w*|\b[A-Z][a-z]+[A-Z]\w*|\b\w+_\w+\b")
 SAFETY_WORDS = re.compile(r"safe|permission|privacy|private|visib|root.?cause|gate|grant|secret", re.IGNORECASE)
 
 
@@ -76,6 +78,13 @@ def check_change(change, target):
         raise CrucibleError("lesson refused: failure_signature and recovery go together")
 
 
+def is_general(lesson):
+    """True only for an audit lesson whose text fields hold no path, link, address, file name or identifier."""
+    change = lesson.get("change") or {}
+    return lesson.get("target") == "audit" and not any(
+        PROJECT_DETAIL.search(str(change[key])) for key in TEXT_KEYS if key in change)
+
+
 def load_lesson(root, lesson_id):
     path = lesson_path(root, lesson_id)
     data = read_json(path, None)
@@ -86,6 +95,7 @@ def load_lesson(root, lesson_id):
     if data.get("target") not in TARGETS or data.get("state") not in STATES:
         raise CrucibleError(f"{path} has no valid target and state")
     check_change(data.get("change"), data["target"])
+    data["general"] = is_general(data)
     return data
 
 
@@ -176,6 +186,7 @@ def propose(root, repeats=None):
     written = []
     for lesson in wanted:
         check_change(lesson["change"], lesson["target"])
+        lesson["general"] = is_general(lesson)
         path = lesson_path(root, lesson["id"])
         old = read_json(path, None)
         if old and old.get("state") != "proposed":

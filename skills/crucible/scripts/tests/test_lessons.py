@@ -224,3 +224,27 @@ class ActiveLessonReadByEngineTests(CrucibleCase):
         save_lesson(Root(root), self.lesson("active"))
         self.assertEqual(run(root, "inventory")[0], 0)
         self.assertEqual(self.unit_addendum(root), ["Check the error branch first."])
+
+
+class GeneralFlagSetByScriptTests(CrucibleCase):
+    def write(self, root, lesson_id, general, **change):
+        lesson = {"id": lesson_id, "target": "audit", "kind": "failure_signature", "signature": "s", "state": "proposed",
+                  "general": general, "evidence": {"count": 3, "records": []}, "change": change}
+        lessons.save(Root(root), lesson)
+        return lessons.load_lesson(Root(root), lesson_id)
+
+    def test_general_flag_set_by_script(self):
+        root = self.make_inventoried({"a.py": "x = 1\n"})
+        clean = self.write(root, "L-clean0001", False, reader_addendum="Check the error branch first.")
+        self.assertIs(clean["general"], True)
+        for index, text in enumerate(("Re-read src/billing/invoice.py twice", "See https://example.org/x",
+                                      "Ask ops@example.org", "Look at computeInvoiceTotal", "Check the retry_policy")):
+            lesson = self.write(root, f"L-detail{index:04d}", True, reader_addendum=text)
+            self.assertIs(lesson["general"], False, text)
+
+    def test_proposed_lessons_carry_the_script_flag(self):
+        root = self.make_inventoried({"a.py": "x = 1\n"})
+        lessons.propose(Root(root), repeats={"repeats": [{"shape": "deploy.sh --env <str>", "runs": 3, "failed": 0,
+                                                          "retried": 0, "tokens": 1}]})
+        workflow = [x for x in lessons.all_lessons(Root(root)) if x["target"] == "workflow"]
+        self.assertEqual([x["general"] for x in workflow], [False])
