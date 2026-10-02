@@ -81,6 +81,8 @@ class CrucibleCase(unittest.TestCase):
             self.assertEqual(code, 0, err)
         self.answer_visibility(root)
         self.answer_workspace(root)
+        code, out, err = run(root, "answer", "models.fable", "false", "--words", "test default")
+        self.assertEqual(code, 0, err)
 
     def answer_workspace(self, root):
         """The base folder question: this repo only (the plain default)."""
