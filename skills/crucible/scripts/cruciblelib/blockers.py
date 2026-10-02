@@ -230,15 +230,19 @@ def start_fix_branch(root, row, repo, branch):
                       lambda: git_step(repo, "checkout", "-b", branch, fix_base(root, repo)))
 
 
-def leave_failed_fix(root, repo, branch, copies):
-    """A failed change or proof strands nothing: put the touched files back from their backups, return to the
-    integration branch (or the base), and drop the fix branch, which holds no commit, so a rerun starts clean."""
+def leave_failed_fix(root, repo, branch, copies, created):
+    """A failed change or proof strands nothing: put the touched files that existed back from their backups, delete
+    the touched files the change created, return to the integration branch (or the base) with a plain checkout that
+    never forces, and drop the fix branch, which holds no commit, so a rerun starts clean."""
     for source, copy in copies:
         if copy and os.path.isfile(copy):
             shutil.copy2(copy, source)
+    for path in created:
+        if os.path.isfile(path):
+            os.remove(path)
     target = INTEGRATION if run_command(["git", "-C", repo, "rev-parse", "--verify", "-q",
                                          f"refs/heads/{INTEGRATION}"], repo)[0] == 0 else fix_base(root, repo)
-    git_step(repo, "checkout", "-q", "-f", target)
+    git_step(repo, "checkout", "-q", target)
     git_step(repo, "branch", "-D", branch)
 
 
@@ -333,10 +337,13 @@ def cmd_fix_run(args):
     if problems:
         refuse(root, GROUP, command, "; ".join(problems))
     repo = repo_dir(root)
-    copies = []
-    for source in plan["backup"]:
+    copies, created = [], []
+    for source in plan["touches"]:
         path = os.path.join(repo, *touch_path(source).split("/"))
-        copies.append((path, backup(root, f"{args.blocker_id}-{touch_path(source).replace('/', '-')}", path)))
+        if os.path.isfile(path):
+            copies.append((path, backup(root, f"{args.blocker_id}-{touch_path(source).replace('/', '-')}", path)))
+        else:
+            created.append(path)
     branch = fix_branch(row, plan)
     try:
         start_fix_branch(root, row, repo, branch)
@@ -348,7 +355,7 @@ def cmd_fix_run(args):
         code, text = run_command(plan["proof"], repo)
     if code != 0:
         try:
-            leave_failed_fix(root, repo, branch, copies)
+            leave_failed_fix(root, repo, branch, copies, created)
         except CrucibleError as exc:
             text += f"; the checkout was not cleaned: {exc}"
     reason = land(root, row, plan, repo) if code == 0 else ""
