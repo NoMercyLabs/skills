@@ -14,7 +14,8 @@ EXPECTED = os.path.join(SKILL, "fixtures", "seeded", "EXPECTED.json")
 
 def expected():
     with open(EXPECTED, encoding="utf-8") as fh:
-        return json.load(fh)
+        data = json.load(fh)
+    return data["defects"] if isinstance(data, dict) else data
 
 
 class SelftestTests(CrucibleCase):
