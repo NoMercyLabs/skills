@@ -303,6 +303,36 @@ class FixBranchTests(BlockerCase):
         self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "fixed")
         self.assertEqual(git(self.repo, "show", f"{self.BRANCH}:lib.py"), "FIXED")
 
+    def test_failed_proof_keeps_unrelated_uncommitted_work(self):
+        self.allow(landing="local_branch")
+        with open(os.path.join(self.repo, "app.py"), "w", encoding="utf-8") as fh:
+            fh.write("DIRTY WORK")
+        blocker = self.planned(proof=f'{PY} -c "import sys; sys.exit(1)"')
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(self.read_text(os.path.join(self.repo, "app.py")), "DIRTY WORK")
+        self.assertIn("broken", self.lib_text())
+        self.assertEqual(git(self.repo, "rev-parse", "--abbrev-ref", "HEAD"), self.base)
+        self.assertEqual(git(self.repo, "branch", "--list", self.BRANCH), "")
+
+    def test_failed_proof_removes_created_file(self):
+        self.allow(landing="local_branch")
+        create = PY + """ -c "open('new.py', 'x').write('NEW')" """.rstrip()
+        proof = PY + """ -c "import sys; sys.exit(0 if open('new.py').read() == 'NEW' else 1)" """.rstrip()
+        failing = f'{PY} -c "import sys; sys.exit(1)"'
+        over = {"root_cause": "new.py:1", "touch": "new.py", "test": "test_new=new.py:1", "change": create}
+        blocker = self.planned(proof=failing, **over)
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1, out + err)
+        self.assertFalse(os.path.exists(os.path.join(self.repo, "new.py")))
+        self.assertEqual(git(self.repo, "status", "--porcelain"), "")
+        self.assertEqual(git(self.repo, "rev-parse", "--abbrev-ref", "HEAD"), self.base)
+        code, out, err = run(self.root, *self.plan_args(blocker, proof=proof, **over))
+        self.assertEqual(code, 0, out + err)
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(git(self.repo, "show", f"{self.BRANCH}:new.py"), "NEW")
+
 
 class FixPlanRefusalTests(BlockerCase):
     def refused(self, text, **over):
