@@ -1,22 +1,16 @@
 import argparse
-import importlib
 import sys
 
+from . import answer, config, filing, gate, inventory, permissions, proof, safety, split, status, verdicts, visibility
 from .common import CrucibleError
 
-# Each module exposes register(sub). A module that is not on disk yet is skipped so slices land one by one.
-COMMAND_MODULES = ["config", "answer", "permissions", "inventory", "proof", "verdicts", "gate", "split", "status", "visibility", "filing", "selftest"]
+# Each module exposes register(sub); a command module lands with its slice and is added here.
+COMMAND_MODULES = [config, answer, permissions, inventory, proof, verdicts, gate, split, status, visibility, filing,
+                   safety]
 
 
 def load_modules(sub):
-    for name in COMMAND_MODULES:
-        full = f"{__package__}.{name}"
-        try:
-            module = importlib.import_module(full)
-        except ModuleNotFoundError as exc:
-            if exc.name != full:
-                raise
-            continue
+    for module in COMMAND_MODULES:
         module.register(sub)
 
 

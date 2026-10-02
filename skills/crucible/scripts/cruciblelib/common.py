@@ -50,12 +50,22 @@ class CrucibleError(Exception):
 
 
 ENV_TEMPLATES = (".env.example", ".env.sample", ".env.template", ".env.dist")
+SECRET_SUFFIXES = (".pem", ".key", ".p12", ".pfx")
+PRIVATE_KEY_NAMES = ("id_rsa", "id_dsa", "id_ecdsa", "id_ed25519")
+CREDENTIAL_JSON = re.compile(r"credentials?|client[_-]secret|service[_-]?account")
 
 
 def is_secret_file(path):
-    """True for .env and every .env.* except the four template names; such a file is never opened."""
+    """True for a file the audit never opens or sends to a model: .env files (not the four templates),
+    private keys and certificates, and credential JSON."""
     name = str(path).replace("\\", "/").rsplit("/", 1)[-1].lower()
-    return (name == ".env" or name.startswith(".env.")) and name not in ENV_TEMPLATES
+    if name == ".env" or name.startswith(".env."):
+        return name not in ENV_TEMPLATES
+    if name.endswith(SECRET_SUFFIXES):
+        return True
+    if name.startswith(PRIVATE_KEY_NAMES):
+        return not name.endswith(".pub")
+    return name.endswith(".json") and bool(CREDENTIAL_JSON.search(name))
 
 
 def read_json(path, default=None):
@@ -155,6 +165,8 @@ class Root:
         return sorted(f[:-5] for f in os.listdir(folder) if f.endswith(".json"))
 
     def snapshot_lines(self, repo, path):
+        if is_secret_file(path):
+            raise CrucibleError(f"{repo}/{path} is a secret file: it is never read or shown")
         full = self.p("snapshot", repo, *path.split("/"))
         if not os.path.isfile(full):
             raise CrucibleError(f"no snapshot of {repo}/{path}: run `crucible inventory`")

@@ -74,6 +74,8 @@ Run in this order. Each command ends in a file on disk. Commands marked "refuses
 Two more command groups run beside the pipeline:/n/n- **Blockers.** When a stage cannot go on: `crucible blocker add DESCRIPTION [--stage S]`, `crucible blocker list`, `crucible fix plan BLOCKER_ID`, `crucible fix run BLOCKER_ID [--yes-words ".."]`. A fix needs the `blocker_fixes` grant, makes a backup first, and re-runs the blocked stage, which must pass. See `references/blockers.md`.
 - **Knowledge.** `crucible knowledge fetch SOURCE_NAME` pulls a granted outside source into `ROOT/knowledge/SOURCE_NAME/` as Markdown, to be absorbed by Grimoira's `index-docs --from`. See `references/memory.md`.
 
+`crucible safety` lists the secret files git tracks, by path only; run it at the start and tell the user. `SECURITY.md` lists every file read or written, every network call and every subprocess.
+
 `crucible X` in this file means `python scripts/crucible.py --root ROOT X`. Run `python scripts/crucible.py --help` for the commands the installed engine has. Never replace a missing command with a hand step: report it.
 
 The engine splits a repo into units of at most 90 KB of whole files, so one reader can hold a unit. The reader shows each file with `python scripts/crucible.py --root ROOT show UNIT FILE [--page N]`, never piped or filtered. The stamp on each block is a keyed hash. The key lives in `ROOT/private/key` and no command prints it. A reader cannot fake a read.
