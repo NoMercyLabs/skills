@@ -249,6 +249,19 @@ class AcceptTests(CrucibleCase):
         self.assertEqual(sorted(os.listdir(findings_dir)), ["F-0001.json", "F-0002.json"])
         self.assertEqual(read_json(os.path.join(root, "findings", "F-0001.json"))["source"], src(UNIT, good))
 
+    def test_score_counts_only_accepted_findings(self):
+        good, bad = good_finding(), good_finding(title="Second handler problem here", siblings=[])
+        root, unit = self.prepared_unit([good, bad], {src(UNIT, good): verdict(), src(UNIT, bad): verdict()})
+        code, out = self.accept(root)
+        self.assertEqual(code, 1, out)
+        code, out, err = run(root, "selftest", "--score")
+        text = out + err
+        self.assertIn("found 0 of", text)
+        self.assertIn("invented 0", text)
+        self.assertNotIn("invented 1", text)
+        code, out, err = run(root, "status")
+        self.assertIn("findings: 0", out + err)
+
     def test_refused_accept_keeps_findings_of_an_earlier_accept(self):
         a, b = good_finding(), good_finding(title="Second handler problem here", siblings=[])
         root, unit = self.prepared_unit([a, b], {src(UNIT, a): verdict(), src(UNIT, b): verdict()})
