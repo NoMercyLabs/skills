@@ -94,6 +94,15 @@ class VerdictCheckTests(CrucibleCase):
         self.assertEqual(code, 1)
         self.assertIn("needs a 'fix' object", out)
 
+    def test_fix_verdict_can_add_visibility_and_links(self):
+        a = good_finding()
+        del a["visibility"]
+        a.pop("verified_links", None)
+        fix = {"visibility": "private", "verified_links": ["app.py:2"]}
+        root, code, out = self.check([a], {src(UNIT, a): verdict("fix", fix=fix)})
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("no field", out)
+
     def test_verdict_check_reads_extra_verdict_files(self):
         a, b = good_finding(), good_finding(title="Second handler problem here")
         root, unit = self.prepared_unit([a, b], {src(UNIT, a): verdict()})
