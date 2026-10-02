@@ -1,0 +1,189 @@
+import json
+import os
+import sys
+
+from cruciblelib.common import Root
+
+from .helpers import CrucibleCase, run
+
+PY = sys.executable.replace("\\", "/")
+FILES = {"app.py": "def start():\n    return load()\n", "lib.py": "def load():\n    return 'broken'\n"}
+CHANGE = f'{PY} -c "open(\'lib.py\', \'w\').write(\'FIXED\')"'
+PROOF = f'{PY} -c "import sys; sys.exit(0 if open(\'lib.py\').read() == \'FIXED\' else 1)"'
+
+
+class BlockerCase(CrucibleCase):
+    def setUp(self):
+        self.root, self.repo = self.make_root(FILES)
+
+    def allow(self, mode="within_limits", grant=True, **extra):
+        words = ["--words", "test words"]
+        self.assertEqual(run(self.root, "answer", "blocker_fixes", json.dumps({"mode": mode, **extra}), *words)[0], 0)
+        if grant:
+            self.assertEqual(run(self.root, "grant", "blocker_fixes", "yes", "--reopen", *words)[0], 0)
+
+    def add(self, text="the readers cannot load the module", stage="inventory"):
+        code, out, err = run(self.root, "blocker", "add", text, "--stage", stage)
+        self.assertEqual(code, 0, err)
+        return out.split()[0]
+
+    def plan_args(self, blocker, **over):
+        opts = {"cause": "load() never returns the module", "evidence": "lib.py:2 return 'broken'",
+                "root_cause": "lib.py:2", "touch": "lib.py", "test": "test_load=lib.py:2", "change": CHANGE,
+                "proof": PROOF, "why": "a retry in app.py would still read the broken value"}
+        opts.update(over)
+        args = ["fix", "plan", blocker]
+        for key, value in opts.items():
+            if value is not None:
+                args += [f"--{key.replace('_', '-')}", value]
+        return args
+
+    def planned(self, **over):
+        blocker = self.add()
+        code, out, err = run(self.root, *self.plan_args(blocker, **over))
+        self.assertEqual(code, 0, out + err)
+        return blocker
+
+    def log(self):
+        return [json.loads(line) for line in self.read_text(os.path.join(self.root, "actions.log")).splitlines()]
+
+    def lib_text(self):
+        return self.read_text(os.path.join(self.repo, "lib.py"))
+
+
+class BlockerRecordTests(BlockerCase):
+    def test_blocker_add_and_list(self):
+        first = self.add()
+        second = self.add("the board has no Severity field", stage="filing")
+        self.assertNotEqual(first, second)
+        code, out, err = run(self.root, "blocker", "list")
+        self.assertEqual(code, 0, err)
+        self.assertIn("readers cannot load", out)
+        self.assertIn("filing", out)
+        self.assertIn("open", out)
+
+    def test_fix_plan_writes_the_plan_file(self):
+        self.allow(landing="local_branch")
+        blocker = self.planned()
+        plan = self.read(self.root, f"fixes/{blocker}.json")
+        self.assertEqual(plan["root_cause"], "lib.py:2")
+        self.assertEqual(plan["touches"], ["lib.py"])
+        self.assertEqual(plan["landing"], "local_branch")
+        self.assertEqual(plan["tests"], [{"name": "test_load", "target": "lib.py:2"}])
+        self.assertEqual(plan["backup"], ["lib.py"])
+        self.assertIn("retry", plan["why_symptom_patch_not_enough"])
+        self.assertTrue(plan["proof"] and plan["change"])
+
+    def test_fix_plan_unknown_blocker_refused(self):
+        code, out, err = run(self.root, *self.plan_args("B-99"))
+        self.assertEqual(code, 1)
+        self.assertIn("B-99", err)
+
+
+class FixPlanRefusalTests(BlockerCase):
+    def refused(self, text, **over):
+        blocker = self.add()
+        code, out, err = run(self.root, *self.plan_args(blocker, **over))
+        self.assertEqual(code, 1, out)
+        self.assertIn(text, err)
+        self.assertFalse(os.path.exists(os.path.join(self.root, "fixes", blocker + ".json")))
+
+    def test_symptom_only_fix_refused(self):
+        self.refused("root cause", touch="app.py")
+
+    def test_fix_test_targets_cause(self):
+        self.refused("test", test="test_start=app.py:2")
+
+    def test_fix_plan_needs_why_a_symptom_patch_is_not_enough(self):
+        self.refused("why", why=" ")
+
+    def test_fix_plan_needs_evidence(self):
+        self.refused("evidence", evidence=None)
+
+    def test_fix_touching_must_not_change_refused_at_plan(self):
+        run(self.root, "brief", "answer", "must_never_change", "--words", "lib.py stays as it is")
+        self.refused("must never change")
+
+
+class FixRunTests(BlockerCase):
+    def test_blocker_fix_needs_grant(self):
+        blocker = self.planned()
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1)
+        self.assertIn("refused: blocker_fixes", err)
+        self.assertIn("broken", self.lib_text())
+        self.assertEqual(self.log()[-1]["status"], "refused")
+
+    def test_fix_run_mode_never_refused(self):
+        self.allow("never")
+        blocker = self.planned()
+        code, out, err = run(self.root, "fix", "run", blocker, "--yes-words", "yes please")
+        self.assertEqual(code, 1)
+        self.assertIn("never", err)
+        self.assertIn("broken", self.lib_text())
+
+    def test_fix_run_mode_each_needs_yes_words(self):
+        self.allow("each")
+        blocker = self.planned()
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1)
+        self.assertIn("--yes-words", err)
+        self.assertIn("broken", self.lib_text())
+        code, out, err = run(self.root, "fix", "run", blocker, "--yes-words", "yes, fix that one")
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.lib_text(), "FIXED")
+
+    def test_backup_before_change_in_fix_run(self):
+        self.allow()
+        blocker = self.planned()
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 0, out + err)
+        rows = self.log()
+        groups = [r["group"] for r in rows if r["status"] == "ok"]
+        self.assertLess(groups.index("backups"), groups.index("blocker_fixes"))
+        copies = os.listdir(os.path.join(self.root, "backups"))
+        self.assertEqual(len(copies), 1)
+        self.assertIn("broken", self.read_text(os.path.join(self.root, "backups", copies[0])))
+        self.assertEqual(self.lib_text(), "FIXED")
+
+    def test_fix_run_aborts_when_backup_fails(self):
+        blocked = os.path.join(self.tmp(), "not-a-folder")
+        with open(blocked, "w", encoding="utf-8") as fh:
+            fh.write("a file, so a backup folder cannot be made here")
+        cfg = Root(self.root).config()
+        cfg["backups"] = {"enabled": True, "path": os.path.join(blocked, "inside")}
+        Root(self.root).save_config(cfg)
+        self.allow()
+        blocker = self.planned()
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1)
+        self.assertIn("backup", err)
+        self.assertIn("broken", self.lib_text())
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "open")
+
+    def test_blocked_stage_rerun_proves_fix(self):
+        self.allow()
+        blocker = self.planned()
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "fixed")
+        last = self.log()[-1]
+        self.assertEqual((last["group"], last["status"]), ("blocker_fixes", "ok"))
+
+    def test_blocked_stage_rerun_failing_marks_failed(self):
+        self.allow()
+        blocker = self.planned(change=f'{PY} -c "pass"')
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "failed")
+        self.assertEqual(self.log()[-1]["status"], "failed")
+        self.assertIn("failed", out + err)
+
+    def test_fix_touching_must_not_change_refused(self):
+        self.allow()
+        blocker = self.planned()
+        run(self.root, "brief", "answer", "must_never_change", "--words", "lib.py stays as it is")
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1)
+        self.assertIn("must never change", err)
+        self.assertIn("broken", self.lib_text())
