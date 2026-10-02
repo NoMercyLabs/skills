@@ -5,7 +5,7 @@ import time
 
 from .backup import backup
 from .common import CrucibleError, Root, read_json, write_json
-from .permissions import authorize, run_action
+from .permissions import authorize, log_action, run_action
 from .repeats import shape_of, transcript_files
 from .transcripts import SHELL_TOOLS, exit_status, inside, read_usage
 
@@ -282,7 +282,14 @@ def cmd_costs(args):
         paths = {r["name"]: r["path"] for r in root.config()["repos"]}
         if args.target_repo not in paths:
             raise CrucibleError(f"{args.target_repo} is not a repo in the config")
-        print(f"moved to {apply_move(root, paths[args.target_repo], args.file, args.heading)}")
+        command = f"costs move {args.target_repo}:{args.file} section {args.heading}"
+        try:
+            target = apply_move(root, paths[args.target_repo], args.file, args.heading)
+        except CrucibleError as exc:
+            log_action(root, "instructions", command, str(exc), "refused")
+            raise
+        log_action(root, "instructions", command, f"moved to {target}", "ok")
+        print(f"moved to {target}")
         return
     if not args.transcripts:
         raise CrucibleError("costs needs --transcripts DIR, or the move command")
