@@ -17,6 +17,8 @@ metadata:
 
 A crucible tests a material for what it really contains. This skill tests a system the same way: every file is read, every claim is checked by a second reader, and a script, not an agent's report, accepts each step.
 
+A plain-language guide for a new user is in `HOW-IT-WORKS.md`.
+
 Check the engine first. One command proves it works on a sample system with known defects:
 
 ```sh

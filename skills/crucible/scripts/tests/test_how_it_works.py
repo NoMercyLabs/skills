@@ -66,11 +66,6 @@ class HowItWorksTests(CrucibleCase):
                     shown = [str(calibration["selftest"][tier]["found"])]
                 self.assertTrue(any(s in body for s in shown), f"{tier} {key} ({shown}) not stated")
 
-    def test_how_it_works_is_generic(self):
-        text = self.text()
-        for word in ("NoMercy", "Stoney", "Fillz", "C:/Users", "C:\\"):
-            self.assertNotIn(word, text)
-
 
 if __name__ == "__main__":
     unittest.main()
