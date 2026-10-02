@@ -120,3 +120,16 @@ class TranscriptScope(CrucibleCase):
         scoped_commands(root, self.write([use(repo, "t1", "ls"), result("t1")]), ["svc"])
         last = read_log(root)[-1]
         self.assertEqual((last["group"], last["status"]), ("transcripts", "ok"))
+
+    def test_transcripts_scoped_to_project(self):
+        root, repo = self.setup_audit()
+        rows = [use(repo, "t1", "in scope"), result("t1"),
+                use(os.path.join(self.tmp(), "elsewhere"), "t2", "out of scope"), result("t2")]
+        self.assertEqual([c["command"] for c in scoped_commands(root, self.write(rows), ["svc"])], ["in scope"])
+
+    def test_transcript_reads_commands_only(self):
+        root, repo = self.setup_audit()
+        rows = [{"type": "user", "cwd": repo, "message": {"role": "user", "content": PROMPT}},
+                use(repo, "t1", "ls"), result("t1")]
+        found = scoped_commands(root, self.write(rows), ["svc"])
+        self.assertEqual([set(c) for c in found], [{"command", "exit"}])
