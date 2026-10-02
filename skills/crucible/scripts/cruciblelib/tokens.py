@@ -102,22 +102,25 @@ def fit_terms(tiers, records):
         verifiers = [r for r in mine if r["role"] == "verifier"]
         found = fit_line([(r["candidates"], r["tokens"]) for r in verifiers]) if verifiers else None
         if found:
-            terms.update(verifier_start_tokens=round(found[0]), verifier_tokens_per_candidate=round(found[1]))
+            terms.update(verifier_start_tokens=round(found[0]), verifier_tokens_per_candidate=round(found[1]),
+                         verifier_samples=len(verifiers))
         judges = [r for r in mine if r["role"] == "judge"]
         if judges:
             terms["judge_call_tokens"] = round(sum(r["tokens"] for r in judges) / sum(r["calls"] for r in judges))
+            terms["judge_samples"] = len(judges)
         mains = [r for r in mine if r["role"] == "main"]
         if mains:
             terms["main_session_tokens"] = round(sum(r["tokens"] for r in mains) / len(mains))
+            terms["main_samples"] = len(mains)
         if terms != tiers[tier]:
             out[tier] = terms
     return out
 
 
-def reader_factor(plan, terms):
-    """Terms fitted from measured reader usage already hold what a forecast_factor lesson corrects; scaling them
-    again would double it."""
-    return 1 if terms.get("samples") else plan.get("forecast_factor", 1)
+def reader_factor(plan, terms, role="reader"):
+    """Terms fitted from measured usage (of this role: reader, verifier, judge or main) already hold what a
+    forecast_factor lesson corrects; scaling them again would double it."""
+    return 1 if terms.get("samples" if role == "reader" else f"{role}_samples") else plan.get("forecast_factor", 1)
 
 
 def project(plan, tiers, records):
@@ -125,12 +128,10 @@ def project(plan, tiers, records):
     done = {(r["role"], r.get("unit")): r for r in records}
     parts = {role: {"spent": 0, "left": 0, "margin": 0.0} for role in ROLES}
 
-    factor = plan.get("forecast_factor", 1)
-
     def add(role, tier, spent, estimate):
         part = parts[role]
         if spent is None:
-            estimate = round(estimate * (reader_factor(plan, tiers[tier]) if role == "reader" else factor))
+            estimate = round(estimate * reader_factor(plan, tiers[tier], role))
             part["left"] += estimate
             part["margin"] += estimate * tiers[tier]["spread"]
         else:
