@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 from assaylib import cli
+from assaylib.common import source_id
 
 
 def run(root, *args):
@@ -35,12 +36,15 @@ class AssayCase(unittest.TestCase):
         os.makedirs(repo, exist_ok=True)
         return repo
 
-    def make_root(self, files, confirm=True, name="svc", config=None):
+    def make_root(self, files, confirm=True, name="svc", config=None, memory=True):
         """Init an audit folder over a fresh repo; optionally confirm and patch config."""
         repo = self.make_repo(files, name)
         root = os.path.join(self.tmp(), "audit")
         code, out, err = run(root, "init", "--repo", repo)
         self.assertEqual(code, 0, err)
+        config = dict(config or {})
+        if memory:
+            config.setdefault("memory", {"kind": "none"})
         if config:
             path = os.path.join(root, "config.json")
             with open(path, encoding="utf-8") as fh:
@@ -86,3 +90,58 @@ class AssayCase(unittest.TestCase):
         with open(os.path.join(root, "ledger", unit + ".json"), "w", encoding="utf-8") as fh:
             json.dump({"unit": unit, "read": read, "skipped": skipped or {},
                        "leads": [] if leads is None else leads}, fh)
+
+    def write(self, root, relative, data):
+        path = os.path.join(root, *relative.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+
+    def read(self, root, relative):
+        with open(os.path.join(root, *relative.split("/")), encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def prepared_unit(self, candidates, verdicts=None, leads=None, files=None, config=None, prove=True):
+        """An inventoried one-unit audit whose reader proof passed, with candidates and verdicts on disk."""
+        files = files or {"app.py": "import os\nTOKEN_PATH = os.environ['X']\nrun(query)\n"}
+        root = self.make_inventoried(files, config=config)
+        unit = "svc-u01"
+        self.write_ledger(root, unit, sorted(files), leads=leads)
+        if prove:
+            code, out, err = run(root, "proof", unit, self.transcript(root, unit, sorted(files)))
+            self.assertEqual(code, 0, out + err)
+        self.write(root, f"candidates/{unit}.json", candidates)
+        if verdicts is not None:
+            self.write(root, f"review/verdicts-{unit}.json", verdicts)
+        return root, unit
+
+
+def good_finding(title="Handler reads its token path unchecked", **over):
+    finding = {
+        "id": "CAND", "repo": "svc", "title": title, "area": "config", "goal": 3, "severity": "medium",
+        "size": "S", "stage": "none",
+        "who": {"affected": "operators", "owner": "platform team"},
+        "what": {"summary": "The token path is read without a default.", "observed": "KeyError at start",
+                 "expected": "a clear message"},
+        "where": [{"kind": "file", "ref": "app.py:2"}],
+        "when": {"trigger": "the variable X is unset", "frequency": "sometimes"},
+        "why": {"cause": "os.environ[...] raises when the key is missing", "verified": True},
+        "how": {"reproduce": ["unset X", "start the app"], "fix": "use os.environ.get with a message",
+                "prove": "a test starting without X"},
+        "evidence": [{"kind": "file_line", "ref": "app.py:2", "quote": "TOKEN_PATH = os.environ['X']"}],
+        "siblings": ["searched: os.environ[, 0 more"], "not_checked": [], "labels": [],
+    }
+    finding.update(over)
+    return finding
+
+
+def verdict(kind="accept", **over):
+    out = {"verdict": kind, "reason": "the line does what the finding says", "checked": ["app.py:2"]}
+    if kind == "reject":
+        out["other_defect"] = "none"
+    out.update(over)
+    return out
+
+
+def src(unit, finding):
+    return source_id(unit, finding)

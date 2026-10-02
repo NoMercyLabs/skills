@@ -82,7 +82,9 @@ class InventoryTests(AssayCase):
         self.assertEqual(code, 0, err)
         self.assertIn("units: 1", out)
         self.assertIn("lines: 10", out)
-        self.assertIn("340", out)
+        self.assertIn("reader tokens: 290", out)
+        self.assertIn("verifier tokens: 44", out)
+        self.assertIn("tokens: 334", out)
         self.assertIn("balanced", out)
 
 

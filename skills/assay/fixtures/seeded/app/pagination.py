@@ -6,7 +6,7 @@ from app import db
 
 def offset_page(total, page, per_page):
     pages = max(1, math.ceil(total / per_page))
-    page = min(max(page, 1), pages)
+    page = min(max(page, 1), pages)   
     return {
         "page": page,
         "per_page": per_page,
