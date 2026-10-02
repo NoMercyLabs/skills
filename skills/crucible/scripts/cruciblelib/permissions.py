@@ -9,7 +9,7 @@ from .status import coverage_counts, coverage_line, repo_coverage_lines, tokens_
 
 GROUPS = ("local_reads", "agent_runs", "installs", "memory_writes", "tracker_board", "tracker_labels",
           "tracker_issues", "tracker_advisories", "tracker_assignees", "tracker_comments", "live_checks",
-          "publish_report", "blocker_fixes", "transcripts", "workspace_clones", "history", "knowledge_sources",
+          "publish_report", "blocker_fixes", "blocker_pushes", "transcripts", "workspace_clones", "history", "knowledge_sources",
           "knowledge_clone", "user_instructions")
 
 # What each group lets the run do, what it costs and where the data goes: the plan prints these verbatim.
@@ -36,6 +36,8 @@ GROUP_INFO = {
                        "the places named in the bounds"),
     "blocker_fixes": ("fix what blocks the audit or filing", "tokens for the fix and its proof",
                       "the landing chosen in config.blocker_fixes"),
+    "blocker_pushes": ("push the fix branch of a fixed blocker to its remote, so a pull request can be opened",
+                       "none", "the remote of the repo; a push to a public repo is public"),
     "transcripts": ("read only the shell commands and exit codes of agent transcripts for the listed repos",
                     "none", "stays on this machine; the conversation and the tool output are never read out"),
     "workspace_clones": ("clone the named repos read-only into the chosen fresh base folder", "disk for the clones",

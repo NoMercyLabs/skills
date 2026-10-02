@@ -33,6 +33,7 @@ If the user does not accept the first point, stop. Do not read a file.
 | `live_checks` | each target and each command, read-only |
 | `publish_report` | the final report anywhere outside the audit folder |
 | `blocker_fixes` | which blockers, how a fix lands, which systems may change live (see `blockers.md`) |
+| `blocker_pushes` | the push of a fix branch to the repo's `origin`; a separate answer from `blocker_fixes`: without it the fix is committed locally and the blocker stays `fixed-local` |
 | `transcripts` | the repos whose agent transcripts may be read, for shell commands and exit codes only |
 | `history` | the repos whose agent history may be read for the user's own past messages, to find answers already given; only the matched line, its session and its date are kept |
 | `workspace_clones` | each repo to clone, its source, and the fresh base folder it goes into; also covers the read-only `git ls-remote` that finds a remote's default branch |

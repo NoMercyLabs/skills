@@ -4,7 +4,7 @@ import os
 import shlex
 import subprocess
 
-from . import brief, rootcause
+from . import brief, clones, rootcause
 from .backup import backup
 from .common import GIT_NETWORK_VERBS, NETWORK_PROGRAMS, CrucibleError, Root, read_json, write_json
 from .permissions import authorize, log_action, now, refuse, run_action
@@ -12,7 +12,7 @@ from .trackers import github
 from .visibility import repo_slug
 
 GROUP = "blocker_fixes"
-STATUSES = ("open", "fixed", "failed")
+STATUSES = ("open", "fixed", "fixed-local", "failed")
 COMMAND_TIMEOUT = 600
 
 
@@ -187,15 +187,62 @@ def check_may_run(root, command, yes_words):
                                      "their own words with --yes-words")
 
 
-def open_pull_request(root, row, repo):
+def fix_branch(row, plan):
+    if plan["landing"] != "push_branch":
+        return f"crucible/fix-{row['id'].lower()}"
+    branch = (plan.get("branch") or "").strip()
+    if not branch or branch.startswith("-"):
+        raise CrucibleError("the landing is push_branch but blocker_fixes.branch names no usable branch")
+    return branch
+
+
+def commit_fix(root, row, plan, repo, branch):
+    """Commit the touched files on the fix branch, as the user's own git config says; the checkout stays on it."""
+    files = [touch_path(t) for t in plan["touches"] if os.path.isfile(os.path.join(repo, *touch_path(t).split("/")))]
+    title = f"fix({row['stage'] or 'audit'}): {row['id']} {row['description']}"
+
+    def step(*args):
+        code, text = run_command(["git", "-C", repo, *args], repo)
+        if code != 0:
+            raise CrucibleError(f"git {args[0]} failed: {text}")
+
+    def action():
+        if not files:
+            raise CrucibleError("the plan touches no file the fix can commit")
+        step("checkout", "-b", branch)
+        step("add", "--", *files)
+        step("commit", "-q", "-m", title, "--", *files)
+        return run_command(["git", "-C", repo, "rev-parse", "--short", "HEAD"], repo)[1]
+
+    return run_action(root, GROUP, f"commit {row['id']}", action)
+
+
+def open_pull_request(root, row, repo, branch):
     """One pull request per fixed blocker, on its own branch, inside the blocker_fixes grant."""
     entry = root.config()["repos"][0]
-    branch = f"crucible/fix-{row['id'].lower()}"
     title = f"fix({row['stage'] or 'audit'}): {row['id']} {row['description']}"
     body = f"Fixes blocker {row['id']}: {row['description']}\n\nThe fix plan and its proof are in the audit folder."
     url = run_action(root, GROUP, f"pr create {row['id']}",
                      lambda: github.GitHub().open_pull_request(repo_slug(entry), branch, title, body))
     print(f"{row['id']} pull request: {url}")
+
+
+def land(root, row, plan, repo):
+    """Commit, push and open the pull request as the landing says; returns why it stopped early, or ''."""
+    stage = "commit"
+    try:
+        branch = fix_branch(row, plan)
+        commit_fix(root, row, plan, repo, branch)
+        if plan["landing"] == "local_branch":
+            return ""
+        stage = "push"
+        clones.push_branch(root, repo, branch)
+        if plan["landing"] == "pr":
+            stage = "pull request"
+            open_pull_request(root, row, repo, branch)
+    except Exception as exc:
+        return f"{stage} failed: {exc}"
+    return ""
 
 
 def cmd_fix_run(args):
@@ -217,14 +264,15 @@ def cmd_fix_run(args):
     code, text = run_command(plan["change"], repo)
     if code == 0:
         code, text = run_command(plan["proof"], repo)
-    status = "fixed" if code == 0 else "failed"
+    reason = land(root, row, plan, repo) if code == 0 else ""
+    status = "failed" if code != 0 else "fixed-local" if reason else "fixed"
     set_status(root, args.blocker_id, status)
-    log_action(root, GROUP, command, f"{status}: stage {row['stage'] or '-'} re-run: {text}",
+    log_action(root, GROUP, command, f"{status}: stage {row['stage'] or '-'} re-run: {text}" + (f"; {reason}" if reason else ""),
                "ok" if code == 0 else "failed")
     print(f"{args.blocker_id} {status}")
-    if code == 0 and plan["landing"] == "pr":
-        open_pull_request(root, row, repo)
-    return 0 if code == 0 else 1
+    if reason:
+        print(f"{args.blocker_id} not landed: {reason}")
+    return 0 if status == "fixed" else 1
 
 
 def register(sub):

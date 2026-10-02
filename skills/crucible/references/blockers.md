@@ -56,9 +56,11 @@ The user chose this in the interview (`blocker_fixes.landing`):
 
 | `landing` | What happens |
 | --- | --- |
-| `pr` (default) | one pull request per fixed blocker, opened with `gh pr create` on the branch `crucible/fix-BLOCKER_ID`; the user merges |
-| `local_branch` | commits on a local branch; nothing is pushed |
-| `push_branch` | a push to the branch the user named in `blocker_fixes.branch` |
+| `pr` (default) | commits the touched files on the branch `crucible/fix-BLOCKER_ID`, pushes it (grant `blocker_pushes`), then opens one pull request per fixed blocker with `gh pr create`; the user merges |
+| `local_branch` | commits on the branch `crucible/fix-BLOCKER_ID`; nothing is pushed |
+| `push_branch` | commits on, and pushes (grant `blocker_pushes`), the branch the user named in `blocker_fixes.branch` |
+
+The commit uses the user's own git config for the author, and the checkout stays on the fix branch so the next stage runs on the fixed code. The push is its own grant, `blocker_pushes`. If the commit, the push or the pull request fails, the blocker's status is `fixed-local` with the reason in `actions.log`, never `fixed`; the report lists it.
 
 ## Live changes
 

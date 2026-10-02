@@ -39,9 +39,13 @@ class BlockerCase(CrucibleCase):
         cfg["repos"][0]["remote"] = "git@host.test:acme/svc.git"
         Root(self.root).save_config(cfg)
         self.gh_calls = []
+        self.base = git(self.repo, "rev-parse", "--abbrev-ref", "HEAD")
         patcher = mock.patch.object(github, "run_gh", self.fake_gh)
         patcher.start()
         self.addCleanup(patcher.stop)
+
+    def back_to_base(self):
+        git(self.repo, "checkout", "-q", self.base)
 
     def fake_gh(self, args, stdin=None):
         self.gh_calls.append(list(args))
@@ -157,6 +161,7 @@ class FixLandingTests(BlockerCase):
         for blocker in (first, second):
             code, out, err = run(self.root, "fix", "run", blocker)
             self.assertEqual(code, 0, out + err)
+            self.back_to_base()
         calls = self.pr_calls()
         self.assertEqual(len(calls), 2)
         heads = [c[c.index("--head") + 1] for c in calls]
@@ -213,7 +218,8 @@ class FixBranchTests(BlockerCase):
         self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "fixed-local")
         self.assertIn("blocker_pushes", out + err)
         self.assertTrue(any(r["group"] == "blocker_pushes" and r["status"] == "refused" for r in self.log()))
-        self.assertEqual(run(self.root, "grant", "blocker_pushes", "yes", "--words", "test words")[0], 0)
+        self.assertEqual(run(self.root, "grant", "blocker_pushes", "yes", "--reopen", "--words", "test words")[0], 0)
+        self.back_to_base()
         blocker = self.planned()
         self.assertEqual(run(self.root, "fix", "run", blocker)[0], 0)
         self.assertEqual(self.remote_branches(), ["crucible/fix-b-002"])

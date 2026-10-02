@@ -1,4 +1,4 @@
-"""The only module that runs `git clone` and `git ls-remote` (an adapter, listed in SECURITY.md).
+"""The only module that runs `git clone`, `git ls-remote` and `git push` (an adapter, listed in SECURITY.md).
 
 A clone starts only inside `permissions.run_action` with the `workspace_clones` grant, so no grant
 means no folder and no process. `ls_remote_branch` is a read-only query of a remote's default branch; it contacts the remote only with the same grant,
@@ -47,3 +47,15 @@ def clone_repos(root, rows, base, finish, group="workspace_clones", **want):
     # the grant is checked before any folder exists
     want = want or {"repos": [r["name"] for r in rows]}
     return run_action(root, group, f"clone {len(rows)} repos into {base}", action, **want)
+
+
+def push_branch(root, repo, branch):
+    """Push one local branch to the repo's origin, only inside the blocker_pushes grant."""
+    def action():
+        out = subprocess.run(["git", "-C", repo, "push", "--quiet", "origin", branch], capture_output=True, text=True,
+                             timeout=300)
+        if out.returncode != 0:
+            raise CrucibleError(f"git push of {branch} failed: {out.stderr.strip()[-300:]}")
+        return f"pushed {branch}"
+
+    return run_action(root, "blocker_pushes", f"push {branch}", action)
