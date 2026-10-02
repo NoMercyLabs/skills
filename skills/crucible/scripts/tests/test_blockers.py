@@ -17,6 +17,19 @@ PROOF = f'{PY} -c "import sys; sys.exit(0 if open(\'lib.py\').read() == \'FIXED\
 class BlockerCase(CrucibleCase):
     def setUp(self):
         self.root, self.repo = self.make_root(FILES)
+        cfg = Root(self.root).config()
+        cfg["repos"][0]["remote"] = "git@host.test:acme/svc.git"
+        Root(self.root).save_config(cfg)
+        self.gh_calls = []
+        patcher = mock.patch.object(github, "run_gh", self.fake_gh)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def fake_gh(self, args, stdin=None):
+        self.gh_calls.append(list(args))
+        if args[:2] == ["pr", "create"]:
+            return f"https://host.test/acme/svc/pull/{len(self.gh_calls)}\n"
+        raise AssertionError(f"unexpected gh call {args}")
 
     def allow(self, mode="within_limits", grant=True, **extra):
         words = ["--words", "test words"]

@@ -81,6 +81,10 @@ class GitHub(Tracker):
             args += ["--assignee", action["assignee"]]
         return run_gh(args).strip().splitlines()[-1]
 
+    def open_pull_request(self, slug, branch, title, body):
+        return run_gh(["pr", "create", "--repo", slug, "--head", branch, "--title", title, "--body", body]
+                      ).strip().splitlines()[-1]
+
     def add_to_board(self, action, ref):
         owner, _, number = action["board"][len("board:"):].partition("/")
         run_gh(["project", "item-add", number, "--owner", owner, "--url", ref])

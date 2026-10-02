@@ -56,7 +56,7 @@ The user chose this in the interview (`blocker_fixes.landing`):
 
 | `landing` | What happens |
 | --- | --- |
-| `pr` (default) | one pull request per fix; the user merges |
+| `pr` (default) | one pull request per fixed blocker, opened with `gh pr create` on the branch `crucible/fix-BLOCKER_ID`; the user merges |
 | `local_branch` | commits on a local branch; nothing is pushed |
 | `push_branch` | a push to the branch the user named in `blocker_fixes.branch` |
 

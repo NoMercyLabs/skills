@@ -7,7 +7,9 @@ import subprocess
 from . import brief, rootcause
 from .backup import backup
 from .common import GIT_NETWORK_VERBS, NETWORK_PROGRAMS, CrucibleError, Root, read_json, write_json
-from .permissions import authorize, log_action, now, refuse
+from .permissions import authorize, log_action, now, refuse, run_action
+from .trackers import github
+from .visibility import repo_slug
 
 GROUP = "blocker_fixes"
 STATUSES = ("open", "fixed", "failed")
@@ -185,6 +187,17 @@ def check_may_run(root, command, yes_words):
                                      "their own words with --yes-words")
 
 
+def open_pull_request(root, row, repo):
+    """One pull request per fixed blocker, on its own branch, inside the blocker_fixes grant."""
+    entry = root.config()["repos"][0]
+    branch = f"crucible/fix-{row['id'].lower()}"
+    title = f"fix({row['stage'] or 'audit'}): {row['id']} {row['description']}"
+    body = f"Fixes blocker {row['id']}: {row['description']}\n\nThe fix plan and its proof are in the audit folder."
+    url = run_action(root, GROUP, f"pr create {row['id']}",
+                     lambda: github.GitHub().open_pull_request(repo_slug(entry), branch, title, body))
+    print(f"{row['id']} pull request: {url}")
+
+
 def cmd_fix_run(args):
     root = Root(args.root)
     root.require_confirmed()
@@ -209,6 +222,8 @@ def cmd_fix_run(args):
     log_action(root, GROUP, command, f"{status}: stage {row['stage'] or '-'} re-run: {text}",
                "ok" if code == 0 else "failed")
     print(f"{args.blocker_id} {status}")
+    if code == 0 and plan["landing"] == "pr":
+        open_pull_request(root, row, repo)
     return 0 if code == 0 else 1
 
 
