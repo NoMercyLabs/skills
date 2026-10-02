@@ -5,6 +5,7 @@ import secrets
 import shutil
 import subprocess
 
+from . import brief
 from .answer import missing_for_confirm
 from .common import CrucibleError, Root, split_lines, write_json
 from .inventory import walk_text_files
@@ -230,6 +231,7 @@ def cmd_confirm(args):
         raise CrucibleError("not every question is answered; missing: " + ", ".join(missing)
                          + ". Ask the user, then record each with `crucible answer KEY VALUE --words ...` "
                          "or `crucible grant GROUP yes|no --words ...` for permissions.GROUP (`crucible next` shows the next one)")
+    brief.require_confirmed(root)
     cfg["confirmed"] = True
     root.save_config(cfg)
     print("config confirmed")

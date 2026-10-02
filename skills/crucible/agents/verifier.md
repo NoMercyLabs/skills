@@ -9,7 +9,7 @@ The dispatch names ROOT (the audit folder) and UNIT. You are not the reader of t
 - Your list: every candidate in `ROOT/candidates/UNIT.json`. Its source id is `UNIT#` plus the first 8 hex of the sha1 of its title. List them with:
   `python -c "import json,hashlib,sys; [print(c['title'], hashlib.sha1(c['title'].encode()).hexdigest()[:8]) for c in json.load(open(sys.argv[1],encoding='utf-8'))]" ROOT/candidates/UNIT.json`
 - The code at the audited commit: `ROOT/snapshot/REPO/PATH`. To see a file with line numbers: `python scripts/crucible.py --root ROOT show UNIT FILE [--page N]`, never piped or filtered. Any other file: the snapshot, in small ranges. Never the working checkout.
-- The user's scope, goals and by-design notes: `ROOT/config.json`.
+- The user's scope, goals and by-design notes: `ROOT/config.json`, and the project brief `ROOT/project-brief.md` (the user's answers, verbatim).
 - The rules: `references/method.md`. The shapes: `references/finding-schema.md`.
 - The reader's dropped leads: `leads` in `ROOT/ledger/UNIT.json`.
 
@@ -21,7 +21,14 @@ The dispatch names ROOT (the audit folder) and UNIT. You are not the reader of t
    - `accept`: the defect is real, the cause is right, and it is not a duplicate of another candidate in your list.
    - `reject`: it is false, or by design (name where the design is written), or not a defect (style, taste, a missing test alone), or a duplicate (name the other source). A reject carries `"other_defect": "none"`, your statement that the lines you checked hold no other defect.
    - `fix`: real, but a field is wrong (cause, goal, area, severity, a wrong line). Give the exact correction.
-4. Special cases:
+4. Check the finding against `ROOT/project-brief.md`. Set `intent` as the schema says, with a `fix` verdict when the candidate has it wrong or empty:
+   - Nothing in the brief touches it: `intent` is `no conflict with the brief`, and there is no `intent_kind`.
+   - The code does what the user said is intentional or must never change: `intent_kind` is `conflicts_intent`. It is not filed; it becomes a question for the user in the report.
+   - The user accepted this risk: `intent_kind` is `accepted_risk`. It is marked accepted by the user and is not filed unless the user asks.
+   - It is about something the user put out of scope: `intent_kind` is `out_of_scope`. It is listed in the report, not filed.
+   - It only relates to a brief line and does not conflict: `intent_kind` is `related`; it is filed.
+   In every case but the first, `intent` is `FIELD: ` plus the user's words, copied from the brief.
+5. Special cases:
    - The candidate has `why.verified: false` and your checked lines prove its cause: the verdict is `fix` with `{"why.verified": true}`, never `accept`.
    - A real defect that the candidate overstates (wrong reach, wrong severity, only in dead code) is `fix`, never `reject`. The same holds when the claimed effect is false but the same code has a different real defect: `fix`, rewriting `title`, `what.summary`, `what.observed`, `what.expected`, `why.cause` (and goal, severity) to the real defect, proven with its own checked lines. A reject whose reason says a defect is real, or names a different one, is refused by the acceptance script.
    - Reject a `why` that only repeats `what`: that is a symptom, not a cause. Fix it to the cause if you can prove it.

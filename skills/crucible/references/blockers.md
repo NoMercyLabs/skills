@@ -38,6 +38,8 @@ A defect in the user's product is not a blocker. It is a finding. Findings are f
 
    It refuses without a `blocker_fixes` grant (see `permissions.md`). With mode `each`, it also needs the user's yes for that plan: pass the user's own words in `--yes-words`. With mode `never`, no fix runs. Every run is logged in `actions.log`.
 
+   The plan lists `touches`: every file, setting or behaviour the fix changes. The engine refuses a plan whose `touches` is empty, or that names an item the user said must never change in `project-brief.md`; that item is a question for the user, not an action.
+
 4. **Backup first.** Before the change, the engine backs up what can be lost (a file, a tracker field, a config, a running system's setting). If a backup is enabled and it fails, the fix is not made.
 
 5. **Prove it.** The engine re-runs the check of the stage that was blocked. It must pass. If it does not, the blocker's status is `failed` and the report says so. The fix, the backup path and the proof go to the log and the report.

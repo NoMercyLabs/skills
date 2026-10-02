@@ -13,9 +13,24 @@ python scripts/crucible.py --root ROOT answer KEY VALUE [--words "the user's wor
 python scripts/crucible.py --root ROOT next
 ```
 
-`VALUE` is JSON or a plain string. `KEY` is a dotted config key, named in each question below. The engine stores the answer and the user's words in `config.answers`, and refuses an unknown top-level key. `crucible next` prints the next unanswered key. After the last interview key come the permission groups (see `permissions.md`). Then run `crucible summary`, show the whole output, and run `crucible confirm` only after the user says yes. `confirm` refuses, and lists what is missing, until the memory choice, the filing choice, the blocker-fix choice and every permission group are answered.
+`VALUE` is JSON or a plain string. `KEY` is a dotted config key, named in each question below. The engine stores the answer and the user's words in `config.answers`, and refuses an unknown top-level key. `crucible next` prints the next unanswered key. After the last interview key come the permission groups (see `permissions.md`). Then run `crucible summary`, show the whole output, and run `crucible confirm` only after the user says yes. `confirm` refuses, and lists what is missing, until the project brief is confirmed, the memory choice, the filing choice, the blocker-fix choice and every permission group are answered.
 
 Order: scope, goals, stages, tracker, auto_file, advisories, owners, privacy_words, budget, models, live_checks, blocker_fixes, backups, memory, knowledge_sources, then the permission groups. Two more answers are asked before filing: `visibility` (confirm each repo and board with `crucible visibility confirm SLUG public|private --words`, after `crucible visibility detect`) and `private_destination` (`advisory`, `private_repo` or `local_report`).
+
+## 0. The project brief
+
+Ask this first, before scope. The audit must never work against the user, so it learns what the project is and what the user expects of it.
+
+1. Collect, then read. `crucible brief collect` lists the files the project describes itself with: READMEs, docs folders, manifests, contribution and security notes, decisions. It prints paths only and skips secret files. Read those files, then store a short summary with `crucible brief summary FILE`: a JSON list of `{"line": ..., "source": ...}`, every source one of the collected paths. The summary is labelled "agent-written, not confirmed".
+2. Ask the seven questions one at a time, and record the user's own words with `crucible brief answer FIELD --words "..."`. The brief never fills an answer for the user.
+   - `purpose`. Ask: "What is the project for, and who uses it?" Why: a defect is judged by who it hurts.
+   - `good`. Ask: "What does good mean for you: what must always work?" Why: it ranks what is serious.
+   - `intentional`. Ask: "What is intentional, even if it looks odd?" Why: an odd choice made on purpose is not a defect.
+   - `must_never_change`. Ask: "What must never change: public contracts, data formats, compatibility promises, behaviour users rely on?" Why: no fix may touch these. Separate items with a new line or a semicolon.
+   - `accepted_risks`. Ask: "Which risks have you accepted on purpose?" Why: an accepted risk is not filed again.
+   - `out_of_scope`. Ask: "What is out of scope or not a goal?" Why: such findings are listed, not filed.
+   - `known_issues`. Ask: "Which issues do you already track or decided not to fix?" Why: they are not filed twice.
+3. Show the result with `crucible brief show`. The user corrects it. Then run `crucible brief confirm` only after the user says yes. A later `brief answer` or `brief summary` needs a new confirm. `crucible confirm` refuses until the brief is confirmed.
 
 ## 1. Scope
 

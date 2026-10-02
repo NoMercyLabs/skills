@@ -60,8 +60,19 @@ class CrucibleCase(unittest.TestCase):
             self.assertEqual(code, 0, err)
         return root, repo
 
-    def answer_everything(self, root):
+    def answer_brief(self, root):
+        """The project brief questions, answered and confirmed through the CLI."""
+        for field in ("purpose", "good", "intentional", "must_never_change", "accepted_risks", "out_of_scope",
+                      "known_issues"):
+            code, out, err = run(root, "brief", "answer", field, "--words", "test default")
+            self.assertEqual(code, 0, err)
+        code, out, err = run(root, "brief", "confirm")
+        self.assertEqual(code, 0, err)
+
+    def answer_everything(self, root, brief=True):
         """Answer the questions confirm needs, through the CLI, the way the interview does."""
+        if brief:
+            self.answer_brief(root)
         for command in (["answer", "auto_file", "false"], ["answer", "blocker_fixes", '{"mode": "never"}']):
             code, out, err = run(root, *command, "--words", "test default")
             self.assertEqual(code, 0, err)
@@ -158,6 +169,7 @@ def good_finding(title="Handler reads its token path unchecked", **over):
                 "prove": "a test starting without X"},
         "evidence": [{"kind": "file_line", "ref": "app.py:2", "quote": "TOKEN_PATH = os.environ['X']"}],
         "siblings": ["searched: os.environ[, 0 more"], "not_checked": [], "labels": [], "visibility": "public",
+        "intent": "no conflict with the brief",
     }
     finding.update(over)
     return finding

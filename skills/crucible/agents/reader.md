@@ -13,6 +13,7 @@ The dispatch names three values. ROOT is the audit folder. UNIT is your unit nam
   then every page it names on its last line (`=== NEXT: ... ===`), with `--page N`, to the end. Each page prints the snapshot lines numbered as audited.
 - Never pipe or filter `show` (no `| grep`, `| head`, `| sed`). Never read a unit file with another tool. Never compare files by script. The accept step checks your own transcript: a file not shown whole by `show` counts as not read, and the whole unit is refused.
 - Any other file of the same repo, for tracing a caller: `ROOT/snapshot/REPO/PATH`, in small ranges. Never the working checkout: it can differ from the audited commit.
+- The project brief: `ROOT/project-brief.md` (the user's own words on what the project is for, what is intentional, what must never change, which risks are accepted, what is out of scope). Read it before your first file. Never raise as a defect what it says is intentional or accepted; set the finding's `intent` field as `references/finding-schema.md` says.
 - The finding shape: `references/finding-schema.md`. The method rules: `references/method.md`.
 
 ## What counts

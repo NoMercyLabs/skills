@@ -2,6 +2,7 @@ import copy
 import glob
 import re
 
+from . import brief
 from .common import CrucibleError, Root, read_json, source_id, write_json
 from .gate import check_finding
 from .inventory import mark_coverage
@@ -190,10 +191,25 @@ def cmd_accept(args):
         return 1
     cands = apply_fixes(root, unit)
     verdicts = load_verdicts(root, unit)
-    promoted = []
+    promoted, routed, failed, route_failed = [], [], 0, 0
+    cfg = root.config()
     for c in cands:
         src = cand_source(unit, c)
         if verdicts[src]["verdict"] == "reject":
+            continue
+        kind = c.get("intent_kind")
+        if kind in brief.ROUTED_KINDS and not (kind == "accepted_risk" and args.file_accepted_risks):
+            # The brief says not to file it: the gate still judges it, then it goes to the report.
+            problems = check_finding(root, {k: v for k, v in c.items() if not k.startswith("_")}, cfg)
+            if problems:
+                failed += 1
+                route_failed += 1
+                print(f"FAIL {src}")
+                for p in problems:
+                    print(f"  {p}")
+            else:
+                brief.route_candidate(root, unit, src, c)
+                routed.append(src)
             continue
         fid = state["accepted"].get(src) or next_finding_id(root, state)
         finding = {k: v for k, v in c.items() if not k.startswith("_")}
@@ -203,8 +219,6 @@ def cmd_accept(args):
         state["accepted"][src] = fid
         root.save_state(state)
         promoted.append(fid)
-    cfg = root.config()
-    failed = 0
     for fid in promoted:
         problems = check_finding(root, root.findings()[fid], cfg)
         if problems:
@@ -213,15 +227,16 @@ def cmd_accept(args):
             for p in problems:
                 print(f"  {p}")
     if failed:
-        print(f"ACCEPT REFUSED {unit}: the gate failed {failed} of {len(promoted)} findings; "
+        print(f"ACCEPT REFUSED {unit}: the gate failed {failed} of {len(promoted) + route_failed} findings; "
               f"fix the candidates and run accept again")
         return 1
     rejected = sum(1 for c in cands if verdicts[cand_source(unit, c)]["verdict"] == "reject")
+    routed_note = f", {len(routed)} not filed because of the brief (see `crucible report`)" if routed else ""
     entry["status"] = "done"
-    entry["reason"] = f"{len(promoted)} accepted, {rejected} rejected"
+    entry["reason"] = f"{len(promoted)} accepted, {rejected} rejected" + (f", {len(routed)} routed" if routed else "")
     root.save_state(state)
     mark_coverage(root, unit, "done")
-    print(f"ACCEPT {unit}: {len(promoted)} findings promoted ({', '.join(promoted) or 'none'}), {rejected} rejected")
+    print(f"ACCEPT {unit}: {len(promoted)} findings promoted ({', '.join(promoted) or 'none'}), {rejected} rejected{routed_note}")
     return 0
 
 
@@ -231,4 +246,6 @@ def register(sub):
     p.set_defaults(func=cmd_verdict_check)
     p = sub.add_parser("accept", help="promote accepted candidates of a unit to findings")
     p.add_argument("unit")
+    p.add_argument("--file-accepted-risks", action="store_true",
+                   help="file findings that match a risk the user accepted (the user asked for them)")
     p.set_defaults(func=cmd_accept)

@@ -25,12 +25,15 @@
 | `not_checked` | list | every claim not opened or run; `[]` when none |
 | `labels` | list | strings the tracker adapter maps |
 | `visibility` | string | `public` or `private`; an exploitable finding is `private` and the gate refuses it otherwise |
+| `intent` | string | `no conflict with the brief` (checked against `project-brief.md`), or `FIELD: the user's words` copied from the brief (FIELD is one of purpose, good, intentional, must_never_change, accepted_risks, out_of_scope, known_issues) |
+| `intent_kind` | string | only with a brief line: `conflicts_intent`, `accepted_risk`, `out_of_scope` or `related`. The first three are not filed: a conflict becomes a question in the report, an accepted risk is marked accepted by the user, an out-of-scope finding is listed. `crucible accept UNIT --file-accepted-risks` files accepted risks when the user asks |
 | `before_you_fix` | object | `current_behaviour`, `callers`, `consumers`, `earlier_fixes`, `instances` |
 
 No field is empty. The text `not checked` is allowed. Placeholder text (`TBD`, `?`, `n/a`, `...`, `-`) is not.
 
 ## What the gate checks
 
+- `intent` is required. The gate checks that a brief line is a line the user said (`project-brief.md`), and that `intent_kind` fits its field.
 - `why.verified: true` needs at least one `file_line` evidence whose `quote` equals the real line in the snapshot.
 - `why.verified: false` needs a `not_checked` entry starting `cause:`.
 - No privacy word from the config, and no key-like string, in any field. Write `<token, masked>` instead of a secret.

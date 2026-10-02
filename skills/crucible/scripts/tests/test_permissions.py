@@ -25,6 +25,7 @@ class PermissionCase(CrucibleCase):
             else:
                 code, out, err = run(root, "grant", group, "no", "--words", "no thanks")
             self.assertEqual(code, 0, err)
+        self.answer_brief(root)
         self.assertEqual(run(root, "confirm")[0], 0)
         return root
 
@@ -53,6 +54,7 @@ class ConfirmGateTests(PermissionCase):
         self.assertIn("missing: permissions.knowledge_sources", err)
         self.assertNotIn("permissions.local_reads", err)
         self.assertEqual(run(root, "grant", GROUPS[-1], "no", "--words", "test")[0], 0)
+        self.answer_brief(root)
         self.assertEqual(run(root, "confirm")[0], 0, err)
 
     def test_confirm_lists_every_missing_answer(self):

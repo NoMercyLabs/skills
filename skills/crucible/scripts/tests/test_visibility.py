@@ -46,6 +46,7 @@ class ConfirmationTests(CrucibleCase):
         cfg = Root(root).config()
         self.assertEqual(cfg["visibility"]["destinations"][slug]["value"], "private")
         self.assertEqual(cfg["visibility"]["destinations"][slug]["words"], "it is a private repo")
+        self.answer_brief(root)
         self.assertEqual(run(root, "confirm")[0], 0)
 
     def test_private_destination_asked(self):
@@ -57,6 +58,7 @@ class ConfirmationTests(CrucibleCase):
         bad = run(root, "answer", "private_destination", '{"kind": "email"}', "--words", "t")
         self.assertEqual(bad[0], 1)
         self.assertEqual(run(root, "answer", "private_destination", '{"kind": "local_report"}', "--words", "t")[0], 0)
+        self.answer_brief(root)
         self.assertEqual(run(root, "confirm")[0], 0)
 
     def answer_everything_but_destination(self, root):

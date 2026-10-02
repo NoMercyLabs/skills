@@ -106,6 +106,7 @@ class FilingCase(CrucibleCase):
         for f in findings:
             self.write(root, f"findings/{f['id']}.json", f)
         if confirm:
+            self.answer_brief(root)
             code, out, err = run(root, "confirm")
             self.assertEqual(code, 0, err)
         return root

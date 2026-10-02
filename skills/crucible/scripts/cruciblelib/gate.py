@@ -2,6 +2,7 @@ import glob
 import os
 import re
 
+from . import brief
 from .common import CrucibleError, Root, has_key_like, read_json
 from .visibility import visibility_problems
 
@@ -165,6 +166,7 @@ def check_finding(root, f, cfg=None):
         block = f["before_you_fix"]
         for field in BEFORE_YOU_FIX:
             need_text(problems, block.get(field) if isinstance(block, dict) else None, f"before_you_fix.{field}")
+    problems += brief.intent_problems(root, f)
     problems += visibility_problems(f)
     problems += text_problems(f, cfg)
     return problems
