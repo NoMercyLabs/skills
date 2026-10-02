@@ -214,6 +214,13 @@ def check_chain(root, f, cfg):
     if not isinstance(verified, bool):
         problems.append("root_cause_verified must be true or false")
     elif verified:
+        from .gate import snapshot_range
+        for r in f.get("verified_links") or []:
+            key = ref_key(r) if isinstance(r, str) else None
+            if key is None:
+                problems.append(f"verified_links entry {r!r} is not path:line")
+            elif snapshot_range(root, f.get("repo"), *key) is None:
+                problems.append(f"verified_links entry {r} is not a real file and line")
         have = {ref_key(r) for r in (f.get("verified_links") or []) if isinstance(r, str)}
         missing = [r for r in link_refs(f) if ref_key(r) not in have]
         if missing:
