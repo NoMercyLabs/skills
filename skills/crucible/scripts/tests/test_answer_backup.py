@@ -69,6 +69,8 @@ class AnswerTests(CrucibleCase):
             seen.append(out)
             if out.startswith("permissions."):
                 self.assertEqual(run(root, "grant", out.split(".", 1)[1], "no", "--words", "test")[0], 0)
+            elif out == "models":
+                run(root, "answer", out, "{}", "--words", "test")
             elif out == "models.fable":
                 run(root, "answer", out, "no", "--words", "test")
             elif out == "auto_file":

@@ -66,7 +66,7 @@ npx skills add NoMercyLabs/skills --skill crucible
 
 Or as a Claude Code plugin: `/plugin marketplace add NoMercyLabs/skills`, then `/plugin install nomercylabs@nomercylabs`.
 
-Grimoira, the optional permanent memory, installs with `/plugin marketplace add NoMercyLabs/skills` and then `/plugin install grimoira@nomercylabs`. If you already added NoMercyLabs/grimoira as a marketplace, keep it: it lists the same plugins.
+Grimoira, the optional permanent memory, installs with `/plugin marketplace add NoMercyLabs/skills` and then `/plugin install grimoira@nomercylabs`. If you already added NoMercyLabs/grimoira as a marketplace, keep it: it lists the same plugins. Grimoira comes from the same publisher as this skill (github.com/NoMercyLabs/grimoira). Read exactly what it changes before you say yes: https://github.com/NoMercyLabs/grimoira/blob/master/HOW-IT-WORKS.md
 
 For a system that spans several repos, crucible detects the layout (`crucible layout`), lists the repos the code points to (`crucible related`), can read them from a fresh base folder (`crucible workspace`) and draws the edges between repos with file:line evidence (`crucible graph`).
 

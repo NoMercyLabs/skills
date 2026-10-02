@@ -15,7 +15,7 @@ python scripts/crucible.py --root ROOT next
 
 `VALUE` is JSON or a plain string. `KEY` is a dotted config key, named in each question below. The engine stores the answer and the user's words in `config.answers`, and refuses an unknown top-level key. `crucible next` prints the next unanswered key. After the last interview key come the permission groups (see `permissions.md`). Then run `crucible summary`, show the whole output, and run `crucible confirm` only after the user says yes. `confirm` refuses, and lists what is missing, until the project brief is confirmed, the memory choice, the filing choice, the blocker-fix choice and every permission group are answered.
 
-Order: scope, goals, stages, tracker, auto_file, advisories, owners, privacy_words, budget, models, live_checks, blocker_fixes, backups, memory, knowledge_sources, then the permission groups. Two more answers are asked before filing: `visibility` (confirm each repo and board with `crucible visibility confirm SLUG public|private --words`, after `crucible visibility detect`) and `private_destination` (`advisory`, `private_repo` or `local_report`).
+Order: scope, goals, stages, tracker, auto_file, advisories, owners, privacy_words, budget, models, models.fable, live_checks, blocker_fixes, backups, memory, knowledge_sources, then the permission groups. Two more answers are asked before filing: `visibility` (confirm each repo and board with `crucible visibility confirm SLUG public|private --words`, after `crucible visibility detect`) and `private_destination` (`advisory`, `private_repo` or `local_report`).
 
 ## 0. The project brief
 
@@ -112,6 +112,14 @@ Ask this first, before scope. The audit must never work against the user, so it 
 - **Key**: `models`.
 - **Ask**: "Readers and verifiers on the balanced tier, checks on the fast tier, cross-unit judgment on the strong tier. Change any?"
 
+## 9b. The top tier for the complex jobs (asked right after models)
+
+- **Why**: four complex jobs gain from the top tier (`models.md` names them). It costs more, so it is the user's yes.
+- **Default**: no. A missing answer counts as no, and `confirm` refuses until it is answered.
+- **Key**: `models.fable` (`yes` or `no`, a policy answer: it carries the user's words). `crucible next` prints it right after `models`.
+- **Ask**: "May I use Claude Fable for the complex jobs?" Show both estimates (`crucible models` prints them).
+- **Record**: `python scripts/crucible.py --root ROOT answer models.fable yes|no --words "the user's words"`.
+
 ## 10. Live checks
 
 - **Why**: some facts live in a running system (a setting, a header), not in the code. Reading them touches a real system.
@@ -181,6 +189,11 @@ Before the three choices, say plainly what Grimoira does, so the user chooses kn
 - It uses disk space: one SQLite file per project.
 - Everything stays on the machine and no network port is opened.
 - A memory is context with a source, never proof. The file and the running code still decide.
+
+**Who publishes it and what it changes:**
+
+- Grimoira comes from the same publisher as this skill (the repository is github.com/NoMercyLabs/grimoira). It is not a third party.
+- Read exactly what it changes before you say yes: https://github.com/NoMercyLabs/grimoira/blob/master/HOW-IT-WORKS.md
 
 Three choices, offered in this order:
 

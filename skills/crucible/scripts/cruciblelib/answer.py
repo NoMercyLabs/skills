@@ -45,7 +45,10 @@ def is_answered(cfg, key):
 
 
 def unanswered(cfg):
-    return [key for key in INTERVIEW_ORDER if not is_answered(cfg, key)]
+    # The top-tier question follows the models answer; `confirm` refuses without it, so `next` must reach it.
+    at = INTERVIEW_ORDER.index("models") + 1
+    asked = INTERVIEW_ORDER[:at] + ("models.fable",) + INTERVIEW_ORDER[at:]
+    return [key for key in asked if not is_answered(cfg, key)]
 
 
 def missing_for_confirm(cfg):
