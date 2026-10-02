@@ -260,19 +260,20 @@ def cmd_calibrate(args):
     state = root.state()
     state["tokens_spent"] += record["tokens"] - sum(r["tokens"] for r in old)
     root.save_state(state)
-    readers = sum(1 for r in ledger["records"] if r["role"] == "reader")
-    if args.refit or (args.role == "reader" and refit_due(readers, min(PILOT_UNITS, len(units)))):
+    pilot = min(PILOT_UNITS, len(units))
+    counted = sum(1 for r in ledger["records"] if r["role"] == args.role) if args.role in ("reader", "verifier") else         sum(1 for r in ledger["records"] if r["role"] == "reader")
+    if args.refit or (args.role in ("reader", "verifier") and refit_due(counted, pilot)):
         changed = fit_terms(tiers, ledger["records"])
         tiers.update(changed)
         calibration["tiers"] = dict(calibration.get("tiers", {}), **changed)
         calibration.setdefault("version", 1)
-        stage = "pilot" if readers == min(PILOT_UNITS, len(units)) else f"after-{readers}"
+        stage = "pilot" if counted == pilot else f"after-{counted}"
         found = summary(project(plan, tiers, ledger["records"]))
         ledger["forecasts"] = [f for f in ledger["forecasts"] if f["stage"] != stage] + [
-            {"stage": stage, "after_units": readers, "parts": {r: p["total"] for r, p in
+            {"stage": stage, "after_units": counted, "parts": {r: p["total"] for r, p in
                                                               project(plan, tiers, ledger["records"]).items()},
              **found}]
-        print(f"refit after {readers} units: " + (", ".join(sorted(changed)) or "no tier") + " updated")
+        print(f"refit after {counted} units: " + (", ".join(sorted(changed)) or "no tier") + " updated")
     ledger["calibration"] = path
     if is_complete(plan, ledger["records"]) and ledger["forecasts"]:
         calibration["runs"] = [r for r in calibration.get("runs", []) if r.get("source") != os.path.basename(root.path)] \
