@@ -1,8 +1,10 @@
 import json
 import os
 import sys
+from unittest import mock
 
 from cruciblelib.common import Root
+from cruciblelib.trackers import github
 
 from .helpers import CrucibleCase, run
 
@@ -78,6 +80,74 @@ class BlockerRecordTests(BlockerCase):
         code, out, err = run(self.root, *self.plan_args("B-99"))
         self.assertEqual(code, 1)
         self.assertIn("B-99", err)
+
+
+class FixLandingTests(BlockerCase):
+    def setUp(self):
+        super().setUp()
+        cfg = Root(self.root).config()
+        cfg["repos"][0]["remote"] = "git@host.test:acme/svc.git"
+        Root(self.root).save_config(cfg)
+        self.gh_calls = []
+        patcher = mock.patch.object(github, "run_gh", self.fake_gh)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def fake_gh(self, args, stdin=None):
+        self.gh_calls.append(list(args))
+        if args[:2] == ["pr", "create"]:
+            return f"https://host.test/acme/svc/pull/{len(self.gh_calls)}\n"
+        raise AssertionError(f"unexpected gh call {args}")
+
+    def pr_calls(self):
+        return [c for c in self.gh_calls if c[:2] == ["pr", "create"]]
+
+    def landing(self):
+        return self.read(self.root, "fixes/B-001.json")["landing"]
+
+    def test_fix_plan_default_landing_is_pr(self):
+        self.planned()
+        self.assertEqual(self.landing(), "pr")
+
+    def test_fix_plan_answered_landing_is_kept(self):
+        for choice in ("local_branch", "push_branch"):
+            with self.subTest(landing=choice):
+                code, out, err = run(self.root, "answer", "blocker_fixes.landing", choice, "--words", "test words")
+                self.assertEqual(code, 0, err)
+                blocker = self.add()
+                self.assertEqual(run(self.root, *self.plan_args(blocker))[0], 0)
+                self.assertEqual(self.read(self.root, f"fixes/{blocker}.json")["landing"], choice)
+
+    def test_fix_default_landing_one_pr_per_fix(self):
+        self.allow()
+        first, second = self.planned(), self.planned()
+        for blocker in (first, second):
+            code, out, err = run(self.root, "fix", "run", blocker)
+            self.assertEqual(code, 0, out + err)
+        calls = self.pr_calls()
+        self.assertEqual(len(calls), 2)
+        heads = [c[c.index("--head") + 1] for c in calls]
+        self.assertEqual(len(set(heads)), 2)
+        for blocker, call, head in zip((first, second), calls, heads):
+            self.assertIn(blocker.lower(), head)
+            self.assertIn(blocker, call[call.index("--title") + 1])
+            self.assertEqual(call[call.index("--repo") + 1], "acme/svc")
+        self.assertEqual([r["command"] for r in self.log() if r["status"] == "ok" and "pr create" in r["command"]],
+                         [f"pr create {first}", f"pr create {second}"])
+
+    def test_fix_local_branch_landing_makes_no_pr(self):
+        self.allow(landing="local_branch")
+        blocker = self.planned()
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(self.pr_calls(), [])
+
+    def test_failed_fix_opens_no_pr(self):
+        self.allow()
+        blocker = self.planned(change=f'{PY} -c "pass"')
+        code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 1)
+        self.assertEqual(self.pr_calls(), [])
 
 
 class FixPlanRefusalTests(BlockerCase):
