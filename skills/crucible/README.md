@@ -2,6 +2,8 @@
 
 The skill an agent loads when asked to audit a whole system: every repo, every file, with proof that each file was read.
 
+New here? Read [HOW-IT-WORKS.md](HOW-IT-WORKS.md): what it does, what it asks, what it never does, and what it costs, with the measured numbers.
+
 ## How a run goes
 
 1. **Interview.** The agent detects your repos by script, then asks its questions one at a time, each with the safest default: scope, goals, stages, tracker, whether findings may be filed automatically, advisories, other owners, privacy words, budget, models, live checks, blocker fixes, backups, permanent memory, outside knowledge sources. Each answer is recorded with `crucible answer`. You then grant or refuse each group of actions (`crucible plan`, `crucible grant`). Nothing runs until you say yes to the summary and every group has an answer.
