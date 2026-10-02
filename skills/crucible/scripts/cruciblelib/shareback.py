@@ -101,6 +101,16 @@ def final_text(root, lesson):
     return draft(lesson)
 
 
+def report_lines(root):
+    """The end-of-run offer: only when share back is on and an active lesson is general."""
+    if not settings(root).get("enabled"):
+        return []
+    from .lessons import active
+    ready = [x["id"] for x in active(root) if eligible(x)]
+    return [f"share back: {len(ready)} general lesson(s) could help other crucible users; "
+            f"to see the exact text run `crucible shareback offer {ready[0]}`; nothing is sent without your yes"] if ready else []
+
+
 def cmd_shareback(args):
     from .common import Root
     from .lessons import load_lesson

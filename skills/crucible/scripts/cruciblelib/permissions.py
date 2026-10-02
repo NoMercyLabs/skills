@@ -311,6 +311,9 @@ def cmd_report(args):
     from .heal import report_lines as healed_lines
     if healed_lines(root):
         print("\n".join(healed_lines(root)))
+    from .shareback import report_lines as shareback_lines
+    if shareback_lines(root):
+        print("\n".join(shareback_lines(root)))
     absorbed, missed = knowledge_lines(state)
     if absorbed or missed:
         print("knowledge sources absorbed: " + str(len(absorbed)))
