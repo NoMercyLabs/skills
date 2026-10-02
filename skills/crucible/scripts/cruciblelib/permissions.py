@@ -5,11 +5,11 @@ import os
 import re
 
 from .common import CrucibleError, Root, mask_secrets, read_json, write_json
-from .status import coverage_counts, coverage_line, tokens_line
+from .status import coverage_counts, coverage_line, repo_coverage_lines, tokens_line
 
 GROUPS = ("local_reads", "agent_runs", "installs", "memory_writes", "tracker_board", "tracker_labels",
           "tracker_issues", "tracker_advisories", "tracker_assignees", "tracker_comments", "live_checks",
-          "publish_report", "blocker_fixes", "transcripts", "knowledge_sources")
+          "publish_report", "blocker_fixes", "transcripts", "workspace_clones", "knowledge_sources")
 
 # What each group lets the run do, what it costs and where the data goes: the plan prints these verbatim.
 GROUP_INFO = {
@@ -37,6 +37,8 @@ GROUP_INFO = {
                       "the landing chosen in config.blocker_fixes"),
     "transcripts": ("read only the shell commands and exit codes of agent transcripts for the listed repos",
                     "none", "stays on this machine; the conversation and the tool output are never read out"),
+    "workspace_clones": ("clone the named repos read-only into the chosen fresh base folder", "disk for the clones",
+                         "the clones stay on this machine; the user's own checkouts are never touched"),
     "knowledge_sources": ("pull the named outside sources into the audit folder", "none",
                           "read-only requests to the named sources"),
 }
@@ -286,6 +288,8 @@ def cmd_report(args):
         print(f"  {r['at']} {r['group']} {r['status']}: {r['command']} ({r['result']})")
     counts, _ = coverage_counts(root)
     print(coverage_line(counts))
+    for line in repo_coverage_lines(root):
+        print(line)
     print(tokens_line(cfg, state))
     from .filing import counts
     by_visibility, by_destination = counts(root)

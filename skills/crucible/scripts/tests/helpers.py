@@ -80,6 +80,12 @@ class CrucibleCase(unittest.TestCase):
             code, out, err = run(root, "grant", group, "no", "--words", "test default")
             self.assertEqual(code, 0, err)
         self.answer_visibility(root)
+        self.answer_workspace(root)
+
+    def answer_workspace(self, root):
+        """The base folder question: this repo only (the plain default)."""
+        code, out, err = run(root, "workspace", "choose", "this_repo", "--words", "test default")
+        self.assertEqual(code, 0, err)
 
     def answer_visibility(self, root, value="private", pointers="false", destination='{"kind": "local_report"}'):
         """The public/private questions: every repo and board confirmed, the yes/no flags, the private destination."""

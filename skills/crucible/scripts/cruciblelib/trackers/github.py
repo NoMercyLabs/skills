@@ -83,3 +83,10 @@ class GitHub(Tracker):
             return {"title": data.get("summary", ""), "body": data.get("description", "")}
         data = json.loads(run_gh(["issue", "view", ref, "--json", "title,body"]))
         return {"title": data.get("title", ""), "body": data.get("body", "")}
+
+
+def owner_repos(owner):
+    """Read-only listing of an owner's repositories: name, visibility, default branch, size in KB."""
+    data = json.loads(run_gh(["repo", "list", owner, "--limit", "200", "--json", "name,visibility,defaultBranchRef,diskUsage"]))
+    return [{"name": r["name"], "visibility": str(r.get("visibility", "")).lower(),
+             "branch": (r.get("defaultBranchRef") or {}).get("name"), "size_kb": r.get("diskUsage")} for r in data]

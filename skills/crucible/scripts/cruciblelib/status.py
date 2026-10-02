@@ -27,6 +27,20 @@ def coverage_counts(root):
     return counts, parents
 
 
+def repo_coverage_lines(root):
+    """One coverage line per repo when the audit has more than one; the plain line is the total."""
+    by_repo = {}
+    for unit in root.units():
+        status = unit_status(root, unit)
+        if status == "split":
+            continue
+        counts = by_repo.setdefault(root.unit(unit)["repo"], {})
+        counts[status] = counts.get(status, 0) + 1
+    if len(by_repo) < 2:
+        return []
+    return [coverage_line(c).replace("coverage:", f"coverage {repo}:", 1) for repo, c in sorted(by_repo.items())]
+
+
 def coverage_line(counts):
     total = sum(counts.values())
     done, carried = counts.get("done", 0), counts.get("carried", 0)
@@ -52,6 +66,8 @@ def cmd_status(args):
     total = sum(counts.values())
     done, carried = counts.get("done", 0), counts.get("carried", 0)
     print(coverage_line(counts))
+    for line in repo_coverage_lines(root):
+        print(line)
     if parents:
         print(f"{parents} split parent{'s' if parents > 1 else ''} not counted")
     coverage = read_json(root.p("coverage.json"))

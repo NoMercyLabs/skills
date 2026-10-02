@@ -87,8 +87,9 @@ def need_list(problems, value, name, minimum=1):
     return value
 
 
-def check_evidence(root, f, problems):
-    """-> number of file_line evidence entries whose quote exists at the cited snapshot lines."""
+def check_evidence(root, f, problems, cited=None):
+    """-> number of file_line evidence entries whose quote exists at the cited snapshot lines.
+    `cited` collects the repos that have at least one good entry (an entry names its repo, default the finding's)."""
     good = 0
     for i, ev in enumerate(need_list(problems, f.get("evidence"), "evidence")):
         name = f"evidence[{i}]"
@@ -104,14 +105,40 @@ def check_evidence(root, f, problems):
         if not parsed:
             problems.append(f"{name}.ref {ev['ref']!r} is not path:line")
             continue
-        text = snapshot_range(root, f.get("repo", ""), *parsed)
+        repo = ev.get("repo") or f.get("repo", "")
+        text = snapshot_range(root, repo, *parsed)
         if text is None:
             problems.append(f"{name}: {ev['ref']} is not in the snapshot (file missing or line past the end)")
         elif not quote_found(ev["quote"], text):
             problems.append(f"{name}: the quote is not at {ev['ref']} in the snapshot")
         else:
             good += 1
+            if cited is not None:
+                cited.add(repo)
     return good
+
+
+def cross_repo_problems(f, cfg, cited):
+    """A finding about a contract between repos cites both sides: good evidence from its own repo and from every
+    other repo it names (`cross_repo`) or cites."""
+    problems = []
+    declared = f.get("cross_repo")
+    if declared is not None and (not isinstance(declared, list) or not declared
+                                 or not all(isinstance(n, str) and n.strip() for n in declared)):
+        return ["cross_repo is a list of repo names"]
+    declared = list(declared or [])
+    known = {r["name"] for r in cfg.get("repos", [])}
+    for name in declared:
+        if name not in known:
+            problems.append(f"cross_repo: {name} is not a repo of this audit")
+    cited_in_evidence = {ev.get("repo") for ev in f.get("evidence", []) if isinstance(ev, dict) and ev.get("repo")}
+    for name in sorted(cited_in_evidence - {f.get("repo")} - set(declared)):
+        problems.append(f"cross_repo: evidence cites {name} but it is not listed in cross_repo")
+    if declared or cited_in_evidence - {f.get("repo")}:
+        for name in [f.get("repo")] + sorted((set(declared) | cited_in_evidence) - {f.get("repo")}):
+            if name in known and name not in cited:
+                problems.append(f"cross_repo: no evidence from {name} (a quote at a real line of that repo is required)")
+    return problems
 
 
 def check_finding(root, f, cfg=None):
@@ -151,7 +178,9 @@ def check_finding(root, f, cfg=None):
     how = need_group(problems, f, "how", ("fix", "prove"))
     for i, step in enumerate(need_list(problems, how.get("reproduce") if how else None, "how.reproduce")):
         need_text(problems, step, f"how.reproduce[{i}]")
-    good_evidence = check_evidence(root, f, problems)
+    cited = set()
+    good_evidence = check_evidence(root, f, problems, cited)
+    problems += cross_repo_problems(f, cfg, cited)
     for i, s in enumerate(need_list(problems, f.get("siblings"), "siblings")):
         need_text(problems, s, f"siblings[{i}]")
     not_checked = f.get("not_checked")

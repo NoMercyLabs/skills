@@ -17,6 +17,7 @@ class PermissionCase(CrucibleCase):
         root, repo = self.make_root(FILES, confirm=False)
         self.assertEqual(run(root, "answer", "auto_file", auto_file, "--words", "test")[0], 0)
         self.assertEqual(run(root, "answer", "blocker_fixes", '{"mode": "never"}', "--words", "test")[0], 0)
+        self.answer_workspace(root)
         self.answer_visibility(root)
         for group in GROUPS:
             if group in grants:
@@ -46,6 +47,7 @@ class ConfirmGateTests(PermissionCase):
         root, repo = self.make_root(FILES, confirm=False)
         self.assertEqual(run(root, "answer", "auto_file", "false", "--words", "test")[0], 0)
         self.assertEqual(run(root, "answer", "blocker_fixes", '{"mode": "never"}', "--words", "test")[0], 0)
+        self.answer_workspace(root)
         self.answer_visibility(root)
         for group in GROUPS[:-1]:
             self.assertEqual(run(root, "grant", group, "no", "--words", "test")[0], 0)
@@ -173,6 +175,7 @@ class GrantTests(PermissionCase):
                 {"auto_file": "false", "blocker_fixes": '{"mode": "never"}', "memory": '{"kind": "none"}'}[key],
                 "--words", "test")
         self.answer_visibility(root)
+        self.answer_workspace(root)
         code, out, err = run(root, "next")
         self.assertEqual(out.strip(), "permissions.agent_runs")
 

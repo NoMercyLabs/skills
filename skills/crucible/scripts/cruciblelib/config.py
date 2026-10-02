@@ -47,6 +47,7 @@ def default_config():
         "visibility": {"pointers": None, "public_board_items": None, "collaborators_see_security": None,
                        "destinations": {}},
         "private_destination": None,
+        "workspace": None,
         "permissions": {},
         "answers": {},
         "budget": {"max_tokens": 0, "tokens_per_line": 34},
@@ -180,6 +181,8 @@ def cmd_summary(args):
     lines += [render(r) for r in cfg["repos"]]
     lines.append("scope include: " + (", ".join(cfg["scope"]["include"]) or "everything"))
     lines.append("scope skip: " + (", ".join(cfg["scope"]["skip"]) or "nothing beyond vendored folders"))
+    from .system import workspace_summary
+    lines.append(workspace_summary(cfg))
     lines.append("goals: " + "; ".join(f"{g['id']} {g['name']}" for g in cfg["goals"]))
     lines.append("stages: " + (", ".join(cfg["stages"]) or "none"))
     lines.append(f"tracker: {cfg['tracker']['kind']}")

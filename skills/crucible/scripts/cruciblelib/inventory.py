@@ -150,6 +150,8 @@ def cmd_inventory(args):
             total_units += 1
     root.save_state(state)
     write_json(root.p("coverage.json"), coverage)
+    from .system import apply_leads
+    apply_leads(root)
     message = f"inventory: {total_units} units, {total_lines} lines, {len(cfg['repos'])} repos"
     if args.delta:
         message += f"; {carried_files} unchanged files carried in {carried_units} units"

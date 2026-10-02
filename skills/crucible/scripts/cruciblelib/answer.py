@@ -7,7 +7,7 @@ from .permissions import GROUPS, now
 PREFIX = "permissions."
 CONFIG_KEYS = ("scope", "goals", "stages", "tracker", "auto_file", "advisories", "owners", "privacy_words",
                "budget", "models", "live_checks", "blocker_fixes", "backups", "memory", "knowledge_sources",
-               "visibility", "private_destination")
+               "visibility", "private_destination", "workspace")
 # auto_file comes right after the tracker: the user is asked where filings go, then whether to file there unasked.
 # A group shares its name with a config key (live_checks, blocker_fixes, knowledge_sources), so groups carry a prefix.
 INTERVIEW_ORDER = CONFIG_KEYS + tuple(PREFIX + group for group in GROUPS)
@@ -15,7 +15,7 @@ INTERVIEW_ORDER = CONFIG_KEYS + tuple(PREFIX + group for group in GROUPS)
 # A policy answer is the user's decision about their own system or risk: it carries their words.
 # Plain facts (scope, goals, stages, tracker, advisories, owners, privacy words, budget) may go without.
 POLICY_KEYS = ("auto_file", "blocker_fixes", "memory", "live_checks", "backups", "knowledge_sources", "models",
-               "visibility", "private_destination")
+               "visibility", "private_destination", "workspace")
 
 CHOICES = {
     "blocker_fixes.mode": ("each", "within_limits", "never"),
@@ -47,7 +47,7 @@ def unanswered(cfg):
 
 
 def missing_for_confirm(cfg):
-    required = ("auto_file", "blocker_fixes", "visibility", "private_destination") + INTERVIEW_ORDER[len(CONFIG_KEYS):]
+    required = ("auto_file", "blocker_fixes", "visibility", "private_destination", "workspace") + INTERVIEW_ORDER[len(CONFIG_KEYS):]
     return [key for key in required if not is_answered(cfg, key)]
 
 
@@ -79,6 +79,9 @@ def check_value(key, value):
                                          or (value["kind"] == "private_repo" and "/" not in str(value.get("repo")))):
         raise CrucibleError("private_destination is an object: kind is one of "
                             + ", ".join(vis.PRIVATE_DESTINATIONS) + "; private_repo also needs repo (owner/name)")
+    if key == "workspace":
+        from .system import check_workspace
+        check_workspace(value)
     if key in ("blocker_fixes", "memory") and not isinstance(value, dict):
         raise CrucibleError(f"{key} is an object, for example "
                             + ('{"mode": "each"}' if key == "blocker_fixes" else '{"kind": "none"}'))

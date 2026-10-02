@@ -68,6 +68,7 @@ class ConfirmationTests(CrucibleCase):
     def answer_the_rest(self, root):
         for command in (["answer", "auto_file", "false"], ["answer", "blocker_fixes", '{"mode": "never"}']):
             self.assertEqual(run(root, *command, "--words", "t")[0], 0)
+        self.answer_workspace(root)
         from cruciblelib.permissions import GROUPS
         for group in GROUPS:
             self.assertEqual(run(root, "grant", group, "no", "--words", "t")[0], 0)
