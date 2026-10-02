@@ -102,6 +102,22 @@ class TokenTests(CrucibleCase):
         total = [int(re.search(r"(?m)^tokens: (\d+)", text).group(1)) for text in (flat, scaled)]
         self.assertEqual(total[1], 2 * total[0])
 
+    def test_forecast_refit_composes_with_active_factor(self):
+        root, units = self.setup_audit()
+        lessons.save(Root(root), {"id": "L-eeee5555", "target": "audit", "kind": "hand", "signature": "s",
+                                  "state": "active", "evidence": {"count": 3, "records": []},
+                                  "change": {"forecast_factor": 2}})
+        for unit in units[:3]:
+            self.assertEqual(self.record(root, unit)[0], 0)
+        plan, ledger = plan_for(Root(root)), tokens.load_ledger(Root(root))
+        tiers = tokens.terms_by_tier(tokens.load_calibration(os.path.join(root, "calibration.json")))
+        tier = units[3]["reader_tier"]
+        self.assertEqual(tiers[tier]["samples"], 3)
+        shown = tokens.project(plan, tiers, ledger["records"])["reader"]
+        self.assertEqual(shown["left"], tokens.reader_tokens(tiers[tier], units[3]["lines"]))
+        first = ledger["first_estimate"]["units"][units[3]["unit"]]
+        self.assertEqual(first, 2 * tokens.reader_tokens(tokens.terms_by_tier({})[tier], units[3]["lines"]))
+
     def test_estimate_includes_start_cost_and_turns(self):
         root, units = self.setup_audit()
         terms = flat_terms(start_tokens=1000, tokens_per_line=10, turn_tokens=500, lines_per_turn=100,
