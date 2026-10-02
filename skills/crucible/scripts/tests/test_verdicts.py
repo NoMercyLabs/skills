@@ -1,6 +1,9 @@
+import argparse
 import os
 import unittest
+from unittest import mock
 
+from cruciblelib import verdicts
 from cruciblelib.common import read_json
 
 from .helpers import CrucibleCase, good_finding, run, src, verdict
@@ -261,6 +264,29 @@ class AcceptTests(CrucibleCase):
         self.assertNotIn("invented 1", text)
         code, out, err = run(root, "status")
         self.assertIn("findings: 0", out + err)
+
+    def test_candidate_without_a_repo_is_refused_not_a_crash(self):
+        a = good_finding()
+        a.pop("repo")
+        a["root_cause_verified"] = True
+        a["verified_links"] = ["app.py:2", "app.py:3"]
+        root, unit = self.prepared_unit([a], {src(UNIT, a): verdict(checked=["app.py:2", "app.py:3"])})
+        code, out = self.accept(root)
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("Traceback", out)
+        self.assertIn("repo is empty", out)
+        findings_dir = os.path.join(root, "findings")
+        self.assertEqual(os.listdir(findings_dir) if os.path.isdir(findings_dir) else [], [])
+
+    def test_crashed_accept_leaves_no_findings(self):
+        a = good_finding()
+        root, unit = self.prepared_unit([a], {src(UNIT, a): verdict()})
+        with mock.patch.object(verdicts, "check_finding", side_effect=RuntimeError("boom")):
+            with self.assertRaises(RuntimeError):
+                verdicts.cmd_accept(argparse.Namespace(root=root, unit=unit, file_accepted_risks=False))
+        findings_dir = os.path.join(root, "findings")
+        self.assertEqual(os.listdir(findings_dir) if os.path.isdir(findings_dir) else [], [])
+        self.assertEqual(read_json(os.path.join(root, "state.json"))["accepted"], {})
 
     def test_refused_accept_keeps_findings_of_an_earlier_accept(self):
         a, b = good_finding(), good_finding(title="Second handler problem here", siblings=[])

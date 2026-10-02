@@ -44,6 +44,8 @@ def parse_ref(ref):
 
 def snapshot_range(root, repo, path, a, b):
     """Text of lines a..b of the snapshot, or None when the file or lines do not exist."""
+    if not isinstance(repo, str) or not repo:
+        return None
     try:
         lines = root.snapshot_lines(repo, path)
     except CrucibleError:

@@ -201,6 +201,19 @@ def restore_writes(root, state, before):
 
 
 def cmd_accept(args):
+    """A crash anywhere in the accept leaves findings/, routing.json and state['accepted'] as they were."""
+    root = Root(args.root)
+    if not os.path.isfile(root.p("state.json")):
+        return accept_unit(args)
+    before = snapshot_writes(root, root.state())
+    try:
+        return accept_unit(args)
+    except Exception:
+        restore_writes(root, root.state(), before)
+        raise
+
+
+def accept_unit(args):
     root = Root(args.root)
     root.require_confirmed()
     unit = args.unit
