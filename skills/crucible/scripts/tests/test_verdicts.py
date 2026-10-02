@@ -229,6 +229,38 @@ class AcceptTests(CrucibleCase):
         self.assertIn("already done", out)
         self.assertEqual(len(os.listdir(os.path.join(root, "findings"))), 2)
 
+    def test_refused_accept_leaves_no_findings(self):
+        good, bad = good_finding(), good_finding(title="Second handler problem here", siblings=[])
+        root, unit = self.prepared_unit([good, bad], {src(UNIT, good): verdict(), src(UNIT, bad): verdict()})
+        before = read_json(os.path.join(root, "state.json"))["accepted"]
+        code, out = self.accept(root)
+        self.assertEqual(code, 1)
+        self.assertIn("the gate failed 1 of 2", out)
+        findings_dir = os.path.join(root, "findings")
+        self.assertEqual(os.listdir(findings_dir) if os.path.isdir(findings_dir) else [], [])
+        self.assertEqual(read_json(os.path.join(root, "state.json"))["accepted"], before)
+        code, out, err = run(root, "status")
+        self.assertIn("findings: 0", out + err)
+        cands = read_json(os.path.join(root, "candidates", UNIT + ".json"))
+        cands[1]["siblings"] = ["searched: os.environ[, 0 more"]
+        self.write(root, f"candidates/{UNIT}.json", cands)
+        code, out = self.accept(root)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(sorted(os.listdir(findings_dir)), ["F-0001.json", "F-0002.json"])
+        self.assertEqual(read_json(os.path.join(root, "findings", "F-0001.json"))["source"], src(UNIT, good))
+
+    def test_refused_accept_keeps_findings_of_an_earlier_accept(self):
+        a, b = good_finding(), good_finding(title="Second handler problem here", siblings=[])
+        root, unit = self.prepared_unit([a, b], {src(UNIT, a): verdict(), src(UNIT, b): verdict()})
+        self.write(root, "findings/F-0001.json", dict(good_finding(), id="F-0001", source=src(UNIT, a)))
+        state = read_json(os.path.join(root, "state.json"))
+        state["accepted"][src(UNIT, a)] = "F-0001"
+        self.write(root, "state.json", state)
+        code, out = self.accept(root)
+        self.assertEqual(code, 1, out)
+        self.assertEqual(os.listdir(os.path.join(root, "findings")), ["F-0001.json"])
+        self.assertEqual(read_json(os.path.join(root, "state.json"))["accepted"], {src(UNIT, a): "F-0001"})
+
     def test_accept_gives_new_ids_after_existing_findings(self):
         a = good_finding()
         root, unit = self.prepared_unit([a], {src(UNIT, a): verdict()})
