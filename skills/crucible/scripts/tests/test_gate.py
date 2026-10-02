@@ -96,7 +96,7 @@ class GateTests(CrucibleCase):
         code, out = self.gate(unverified)
         self.assertEqual(code, 1)
         self.assertIn("cause:", out)
-        unverified["not_checked"] = ["cause: the deploy script may set X"]
+        unverified["not_checked"] += ["cause: the deploy script may set X"]
         code, out = self.gate(unverified)
         self.assertEqual(code, 0, out)
 

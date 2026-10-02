@@ -195,6 +195,8 @@ def check_finding(root, f, cfg=None):
         block = f["before_you_fix"]
         for field in BEFORE_YOU_FIX:
             need_text(problems, block.get(field) if isinstance(block, dict) else None, f"before_you_fix.{field}")
+    from . import rootcause  # imported here: rootcause borrows this module's helpers
+    problems += rootcause.check_chain(root, f, cfg)
     problems += brief.intent_problems(root, f)
     problems += visibility_problems(f)
     problems += text_problems(f, cfg)

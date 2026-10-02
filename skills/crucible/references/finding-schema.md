@@ -28,6 +28,12 @@
 | `visibility` | string | `public` or `private`; an exploitable finding is `private` and the gate refuses it otherwise |
 | `intent` | string | `no conflict with the brief` (checked against `project-brief.md`), or `FIELD: the user's words` copied from the brief (FIELD is one of purpose, good, intentional, must_never_change, accepted_risks, out_of_scope, known_issues) |
 | `intent_kind` | string | only with a brief line: `conflicts_intent`, `accepted_risk`, `out_of_scope` or `related`. The first three are not filed: a conflict becomes a question in the report, an accepted risk is marked accepted by the user, an out-of-scope finding is listed. `crucible accept UNIT --file-accepted-risks` files accepted risks when the user asks |
+| `chain` | object | `symptom` (`text`, `ref`), `mechanism` (list of steps) and `root_cause`. Each step and the root cause hold `ref` (path:line), `claim` and `evidence` (`{kind: file_line or explore, ref, quote, repo?}`). The root cause is at a different file:line than the symptom |
+| `exploration` | object | `runs` (the `explore` targets run, at least one), `followed` (callers and sources followed), `not_followed` (list of `{item, reason}`; `[]` when none) |
+| `root_cause_verified` | boolean | true only after the verifier re-opened every link; the reader writes false |
+| `verified_links` | list | only with `root_cause_verified: true`: the `ref` of every link the verifier re-opened |
+| `do_not_fix_by` | list | symptom patches that would hide the problem (a retry, a try/catch, a null check at the symptom, a bigger timeout) |
+| `prior_fix` | object | required when `explore` shows an earlier fix or revert on a cited line: `commits`, `treated_symptom` (boolean), `why_back` |
 | `before_you_fix` | object | `current_behaviour`, `callers`, `consumers`, `earlier_fixes`, `instances` |
 
 No field is empty. The text `not checked` is allowed. Placeholder text (`TBD`, `?`, `n/a`, `...`, `-`) is not.
@@ -39,6 +45,13 @@ A finding that spans repos lists the other repos in `cross_repo` and carries evi
 - `intent` is required. The gate checks that a brief line is a line the user said (`project-brief.md`), and that `intent_kind` fits its field.
 - `why.verified: true` needs at least one `file_line` evidence whose `quote` equals the real line in the snapshot.
 - `why.verified: false` needs a `not_checked` entry starting `cause:`.
+- `chain` needs evidence on every link: a `file_line` quote at a real line of the snapshot, or an `explore` entry whose `ref` is one of `exploration.runs`.
+- `why.cause` that mostly repeats `what` (more than 60 percent of its words already in the summary, observed or expected text) is refused. So is a `chain.root_cause.ref` equal to `chain.symptom.ref`.
+- `exploration` is required with at least one run. Every `not_followed` entry has a reason. A finding with no `siblings` is refused.
+- `root_cause_verified: true` needs `verified_links` to list every link. `crucible accept` also needs the verdict's `checked` lines to cover every link. `false` needs a `not_checked` entry starting `root_cause:`.
+- When git shows a fix or revert commit on a cited line, the gate wants `prior_fix` naming that commit and saying whether it treated a symptom.
+- `do_not_fix_by` needs at least one entry. A filed issue has a "Root cause" section (the chain) and a "Do not fix by" section.
+- `crucible group` lists accepted findings that share a root-cause location (same repo, file, overlapping lines). One shared cause is one issue that lists every symptom; whether two different places are one cause is a judgment for the cross-unit step.
 - No privacy word from the config, and no key-like string, in any field. Write `<token, masked>` instead of a secret.
 - No private path and no person's name in any field: a finding may be filed on a public repo.
 

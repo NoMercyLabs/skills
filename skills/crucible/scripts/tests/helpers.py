@@ -176,7 +176,20 @@ def good_finding(title="Handler reads its token path unchecked", **over):
         "evidence": [{"kind": "file_line", "ref": "app.py:2", "quote": "TOKEN_PATH = os.environ['X']"}],
         "siblings": ["searched: os.environ[, 0 more"], "not_checked": [], "labels": [], "visibility": "public",
         "intent": "no conflict with the brief",
+        "chain": {
+            "symptom": {"text": "the app stops at start with a KeyError", "ref": "app.py:3"},
+            "mechanism": [{"ref": "app.py:3", "claim": "run starts after the module level read has already failed",
+                           "evidence": {"kind": "file_line", "ref": "app.py:3", "quote": "run(query)"}}],
+            "root_cause": {"ref": "app.py:2", "claim": "the read indexes the environment and nothing supplies a default",
+                           "evidence": {"kind": "file_line", "ref": "app.py:2",
+                                        "quote": "TOKEN_PATH = os.environ['X']"}},
+        },
+        "exploration": {"runs": ["app.py:2"], "followed": ["app.py:3: the only caller of the module"],
+                        "not_followed": [{"item": "the deploy script that sets X", "reason": "not in the audited files"}]},
+        "root_cause_verified": False,
+        "do_not_fix_by": ["a try/except KeyError around the read that hides the missing setting"],
     }
+    finding["not_checked"] = ["root_cause: the verifier has not re-opened the chain yet"]
     finding.update(over)
     return finding
 

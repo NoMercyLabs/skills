@@ -10,7 +10,7 @@ from cruciblelib.trackers.base import text_digest
 
 from .helpers import CrucibleCase, good_finding, run
 
-FILES = {"app.py": "import os\nTOKEN_PATH = os.environ['X']\n"}
+FILES = {"app.py": "import os\nTOKEN_PATH = os.environ['X']\nrun(query)\n"}
 PUBLIC_TITLE = "Handler reads its token path unchecked"
 PRIVATE_TITLE = "Admin endpoint skips the authorization check"
 PRIVATE_SUMMARY = "Any caller reaches the admin route without a login."

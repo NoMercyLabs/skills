@@ -6,6 +6,7 @@ it, never reaches a public destination; a public pointer says only that a privat
 import hashlib
 import json
 
+from . import rootcause
 from . import visibility as vis
 from .common import CrucibleError, Root, read_json, write_json
 from .permissions import (authorize, dryrun_hashes, log_action, record_dryrun, refuse, require_approved,
@@ -28,6 +29,7 @@ def render_body(f):
         ("Expected", f["what"]["expected"]), ("Where", where),
         ("When", f"{f['when']['trigger']} ({f['when']['frequency']})"),
         ("Cause", f["why"]["cause"] + (" (verified)" if f["why"]["verified"] else " (not verified)")),
+        ("Root cause", rootcause.render_chain(f)), ("Do not fix by", rootcause.render_do_not_fix_by(f)),
         ("Reproduce", steps), ("Fix", f["how"]["fix"]), ("Prove", f["how"]["prove"]),
         ("Evidence", evidence), ("Siblings", "\n".join(f"- {s}" for s in f["siblings"])),
         ("Not checked", "\n".join(f"- {s}" for s in f["not_checked"]) or "nothing"),

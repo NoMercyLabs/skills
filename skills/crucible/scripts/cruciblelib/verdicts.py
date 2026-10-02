@@ -2,7 +2,7 @@ import copy
 import glob
 import re
 
-from . import brief
+from . import brief, rootcause
 from .common import CrucibleError, Root, read_json, source_id, write_json
 from .gate import check_finding
 from .inventory import mark_coverage
@@ -117,6 +117,9 @@ def check_verdicts(root, unit, only=None):
                 continue
         found = checked_problems(root, repo, v["checked"] if isinstance(v["checked"], list) else [v["checked"]])
         bad += [f"{s}: {b}" for b in found]
+        if v["verdict"] != "reject":
+            final = trial if v["verdict"] == "fix" else by_src[s]
+            bad += [f"{s}: {b}" for b in rootcause.verdict_link_problems(final, v)]
     ledger = root.ledger(unit) or {}
     seen = verdicts.get("_leads", {})
     leads = ledger.get("leads") or []

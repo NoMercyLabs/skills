@@ -373,6 +373,10 @@ class GraphTests(SystemCase):
     def cross_finding(self, root, evidence):
         finding = good_finding(repo="web", cross_repo=["api-client"], evidence=evidence)
         finding["where"] = [{"kind": "file", "ref": "package.json:3"}]
+        dependency = {"kind": "file_line", "ref": "package.json:3", "quote": '"dependencies": {"@acme/api-client": "^2.0.0"}'}
+        finding["chain"]["symptom"]["ref"] = "package.json:1"
+        finding["chain"]["mechanism"] = [{"ref": "package.json:3", "claim": "the client pins the api package", "evidence": dependency}]
+        finding["chain"]["root_cause"] = {"ref": "package.json:3", "claim": "the pin allows only one major", "evidence": dependency}
         path = os.path.join(self.tmp(), "F.json")
         self.write(os.path.dirname(path), "F.json", finding)
         return run(root, "gate", path)
