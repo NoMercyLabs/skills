@@ -308,6 +308,9 @@ def cmd_report(args):
     print("\n".join(report_lines(root)))
     from .brief import routing_lines
     print("\n".join(routing_lines(root)))
+    from .heal import report_lines as healed_lines
+    if healed_lines(root):
+        print("\n".join(healed_lines(root)))
     absorbed, missed = knowledge_lines(state)
     if absorbed or missed:
         print("knowledge sources absorbed: " + str(len(absorbed)))
