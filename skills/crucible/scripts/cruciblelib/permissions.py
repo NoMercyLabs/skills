@@ -9,7 +9,8 @@ from .status import coverage_counts, coverage_line, repo_coverage_lines, tokens_
 
 GROUPS = ("local_reads", "agent_runs", "installs", "memory_writes", "tracker_board", "tracker_labels",
           "tracker_issues", "tracker_advisories", "tracker_assignees", "tracker_comments", "live_checks",
-          "publish_report", "blocker_fixes", "transcripts", "workspace_clones", "history", "knowledge_sources")
+          "publish_report", "blocker_fixes", "transcripts", "workspace_clones", "history", "knowledge_sources",
+          "knowledge_clone")
 
 # What each group lets the run do, what it costs and where the data goes: the plan prints these verbatim.
 GROUP_INFO = {
@@ -44,6 +45,8 @@ GROUP_INFO = {
                 "are kept, never the assistant's text or tool output"),
     "knowledge_sources": ("pull the named outside sources into the audit folder", "none",
                           "read-only requests to the named sources"),
+    "knowledge_clone": ("clone the named git knowledge sources into a scratch folder and read their text", "disk "
+                        "for the clone until it is read", "the clone stays on this machine and is removed after the read"),
 }
 
 LIST_BOUNDS = ("repos", "labels", "assignees", "kinds", "sources", "targets", "commands")

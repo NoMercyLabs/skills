@@ -47,10 +47,10 @@ python scripts/crucible.py --root ROOT knowledge fetch SOURCE_NAME
 
 The engine writes Markdown into `ROOT/knowledge/SOURCE_NAME/`. Then absorb it: `index-docs --from ROOT/knowledge/SOURCE_NAME`.
 
-- Source kinds: `github` (the repo's issues, pull requests and discussions, by read-only `gh` calls; wiki and releases are not read), `url` (one public https page, as text), `folder` (an export folder the user points at, for example a knowledge base or chat export). A `git` source is recorded as not reached, with the advice to clone it and name its docs folder as a `folder` source.
+- Source kinds: `github` (the repo's issues, pull requests and discussions, by read-only `gh` calls; wiki and releases are not read), `url` (one public https page, as text), `folder` (an export folder the user points at, for example a knowledge base or chat export). A `git:URL` source is cloned into a scratch folder by the clones adapter, its text files are read, and the clone is removed. It needs the `knowledge_clone` grant (`crucible grant knowledge_clone yes --bound sources=git:URL`) next to `knowledge_sources`; without it the source is refused and nothing is cloned.
 - A source is a name from `knowledge_sources`, or written inline as `github:OWNER/REPO`, `url:ADDRESS` or `folder:PATH`. The grant lists it in `sources=`, exactly as written. `knowledge list` shows each source and its status.
 - The command prints the `index-docs --from` line the memory step runs. It never runs it.
-- The fetch needs the `knowledge_sources` grant and is logged in `actions.log`.
+- The fetch needs the `knowledge_sources` grant (and `knowledge_clone` for a `git` source) and is logged in `actions.log`.
 - Secrets are masked and privacy words refused before anything is written. A refusal stops the whole write for that source.
 - A source that cannot be reached is not skipped silently. The engine prints what the user can export and records the source as not absorbed. `crucible report` lists it with the reason.
 - The final report lists every source absorbed, with counts from `stats`, and every source named but not absorbed.

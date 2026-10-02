@@ -26,8 +26,9 @@ def ls_remote_branch(root, source):
     return match.group(1) if match else "unknown"
 
 
-def clone_repos(root, rows, base, finish):
-    """Clone every row (name, source, dest) behind the workspace_clones grant; finish(row) runs after each clone."""
+def clone_repos(root, rows, base, finish, group="workspace_clones", **want):
+    """Clone every row (name, source, dest) behind a grant (workspace_clones, or the one the caller names);
+    finish(row) runs after each clone. `want` is the bound the grant must cover (default: the repo names)."""
     def action():
         done = []
         for row in rows:
@@ -44,5 +45,5 @@ def clone_repos(root, rows, base, finish):
         return ", ".join(done)
 
     # the grant is checked before any folder exists
-    return run_action(root, "workspace_clones", f"clone {len(rows)} repos into {base}", action,
-                      repos=[r["name"] for r in rows])
+    want = want or {"repos": [r["name"] for r in rows]}
+    return run_action(root, group, f"clone {len(rows)} repos into {base}", action, **want)

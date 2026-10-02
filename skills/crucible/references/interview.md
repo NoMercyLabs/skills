@@ -222,7 +222,7 @@ Then absorb every local knowledge source in scope:
 
 ### Where does more knowledge live outside this machine?
 
-Then ask this question (key `knowledge_sources`, a list of `{"name", "kind", "target"}`, with `kind` one of `github`, `url`, `folder`):
+Then ask this question (key `knowledge_sources`, a list of `{"name", "kind", "target"}`, with `kind` one of `github`, `url`, `git`, `folder`):
 
 "Where does more knowledge live outside this machine?"
 
@@ -239,7 +239,7 @@ Default: none. For each source the user names:
 
 1. Record it as a named entry in `knowledge_sources`.
 2. Grant it read-only: `crucible grant knowledge_sources yes --bound sources=NAME` (see `permissions.md`).
-3. Fetch it: `crucible knowledge fetch NAME`. The engine writes Markdown into `ROOT/knowledge/NAME/`. A `github` source uses read-only `gh` calls. A `url` source is a site or a git repository. A `folder` source is an export the user points at (for example a Confluence, Notion or chat export).
+3. Fetch it: `crucible knowledge fetch NAME`. The engine writes Markdown into `ROOT/knowledge/NAME/`. A `github` source uses read-only `gh` calls. A `url` source is a site. A `git` source is a repository URL; it also needs `crucible grant knowledge_clone yes --bound sources=git:URL`, and the engine clones it into a scratch folder, reads its text and removes it. A `folder` source is an export the user points at (for example a Confluence, Notion or chat export).
 4. Absorb it: `index-docs --from ROOT/knowledge/NAME`.
 
 Grimoira reads local folders only, which is why the fetch step exists. The engine masks secrets and refuses privacy words before it writes anything. A source the engine cannot reach is reported with what the user can export, and the report lists it as not absorbed. It is never skipped silently.

@@ -1,19 +1,24 @@
 """Knowledge adapter: pulls the sources the user named and granted into ROOT/knowledge/NAME/ as Markdown.
 
 Every fetch starts inside `permissions.run_action` with the `knowledge_sources` grant, so no grant means
-no request. GitHub goes through the read-only `gh` helper of the tracker adapter; a website goes through
+no request. A git source also needs the `knowledge_clone` grant and is cloned by `clones.clone_repos`, the
+only place that runs git network calls. GitHub goes through the read-only `gh` helper of the tracker adapter; a website goes through
 one HTTPS GET. Text is masked and checked for privacy words before anything is written.
 """
 import hashlib
 import json
 import os
 import re
+import shutil
+import stat
+import tempfile
 import urllib.request
 from html.parser import HTMLParser
 
+from . import clones
 from .common import CrucibleError, Root, is_secret_file, mask_secrets
 from .gate import has_privacy_word
-from .permissions import now, run_action
+from .permissions import authorize, now, run_action
 from .trackers.github import run_gh
 
 KINDS = ("github", "url", "git", "folder")
@@ -124,8 +129,26 @@ def read_url(target):
     return {"page.md": raw + "\n"}, []
 
 
-def read_git(target):
-    raise Unreachable("a git source is not cloned here (cloning belongs to the workspace_clones adapter)")
+def drop_read_only(func, path, _exc):
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
+def read_git(root, target, grant_key):
+    """Clone into a scratch folder through the clones adapter, read it as a folder, remove the clone."""
+    scratch = tempfile.mkdtemp(prefix="crucible-knowledge-")
+    dest = os.path.join(scratch, "clone")
+    try:
+        try:
+            clones.clone_repos(root, [{"name": grant_key, "source": target, "dest": dest}], scratch, lambda row: None,
+                               group="knowledge_clone", sources=[grant_key])
+        except CrucibleError as exc:
+            if str(exc).startswith("refused:"):
+                raise
+            raise Unreachable(str(exc))
+        return read_folder(dest)
+    finally:
+        shutil.rmtree(scratch, onerror=drop_read_only)
 
 
 def read_folder(target):
@@ -133,7 +156,7 @@ def read_folder(target):
         raise Unreachable(f"{target} is not a folder that exists")
     docs = {}
     for folder, dirs, names in os.walk(target):
-        dirs.sort()
+        dirs[:] = sorted(d for d in dirs if d != ".git")
         for name in sorted(names):
             full = os.path.join(folder, name)
             if (not name.lower().endswith(TEXT_SUFFIXES) or is_secret_file(name) or os.path.islink(full)
@@ -145,7 +168,7 @@ def read_folder(target):
     return docs, []
 
 
-READERS = {"github": read_github, "url": read_url, "git": read_git, "folder": read_folder}
+READERS = {"github": read_github, "url": read_url, "folder": read_folder}
 
 
 def record(root, name, **entry):
@@ -160,7 +183,7 @@ def fetch(root, name, kind, target, grant_key):
     outcome = {}
 
     def action():
-        docs, notes = READERS[kind](target)
+        docs, notes = read_git(root, target, grant_key) if kind == "git" else READERS[kind](target)
         if not docs:
             raise Unreachable("no readable documents in the source")
         docs = {rel: mask_secrets(text) for rel, text in docs.items()}
@@ -176,6 +199,8 @@ def fetch(root, name, kind, target, grant_key):
         outcome.update(count=len(docs), notes=notes, base=base)
         return f"{len(docs)} documents into {base}"
 
+    if kind == "git":
+        authorize(root, "knowledge_clone", f"knowledge clone {target}", sources=[grant_key])
     try:
         run_action(root, "knowledge_sources", f"knowledge fetch {kind}:{target}", action, sources=[grant_key])
     except Unreachable as exc:

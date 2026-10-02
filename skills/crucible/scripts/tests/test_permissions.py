@@ -55,7 +55,7 @@ class ConfirmGateTests(PermissionCase):
             self.assertEqual(run(root, "grant", group, "no", "--words", "test")[0], 0)
         code, out, err = run(root, "confirm")
         self.assertEqual(code, 1)
-        self.assertIn("missing: permissions.knowledge_sources", err)
+        self.assertIn(f"missing: permissions.{GROUPS[-1]}", err)
         self.assertNotIn("permissions.local_reads", err)
         self.assertEqual(run(root, "grant", GROUPS[-1], "no", "--words", "test")[0], 0)
         self.answer_brief(root)
