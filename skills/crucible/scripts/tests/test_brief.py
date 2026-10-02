@@ -280,3 +280,9 @@ class BriefShapeTests(CrucibleCase):
         verifier = self.read_text(os.path.join(base, "agents", "verifier.md"))
         for kind in ("conflicts_intent", "accepted_risk", "out_of_scope"):
             self.assertIn(kind, verifier)
+
+    def test_verifier_brief_asks_for_links_and_visibility(self):
+        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        verifier = self.read_text(os.path.join(base, "agents", "verifier.md"))
+        self.assertIn("verified_links", verifier)
+        self.assertIn('"visibility": "private"', verifier)
