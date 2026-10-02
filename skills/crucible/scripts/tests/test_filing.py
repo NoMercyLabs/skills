@@ -85,6 +85,7 @@ class FilingCase(CrucibleCase):
         self.assertEqual(run(root, "answer", "auto_file", auto, "--words", "test")[0], 0)
         self.assertEqual(run(root, "answer", "blocker_fixes", '{"mode": "never"}', "--words", "test")[0], 0)
         self.answer_workspace(root)
+        self.answer_fable(root)
         for flag, value in {"pointers": "false", "public_board_items": "false", "collaborators_see_security": "true",
                             **(flags or {})}.items():
             self.assertEqual(run(root, "answer", f"visibility.{flag}", value, "--words", "test")[0], 0)

@@ -174,12 +174,11 @@ def cmd_estimate(args):
     print(f"reader tokens: {reader} ({READER_TOKENS_PER_LINE} per line)")
     print(f"verifier tokens: {verifier} ({int(VERIFIER_SHARE * 100)}% on top of the reader)")
     print(f"tokens: {tokens} (about {tokens / lines:.0f} per line)" if lines else f"tokens: {tokens}")
-    tiers = {}
-    for role, amount in (("reader", reader), ("verifier", verifier)):
-        tier = cfg["models"][role]
-        tiers[tier] = tiers.get(tier, 0) + amount
-    for tier, amount in sorted(tiers.items()):
-        print(f"tier {tier}: {amount}")
+    from .models import plan_for, tier_lines
+    plan = plan_for(root)
+    for line in tier_lines(plan["estimate"]):
+        print(line)
+    print(f"judgment tokens: {plan['judgment_tokens']} (in the tiers above, not in the tokens total)")
     cap = budget["max_tokens"]
     print("cap: " + (f"{cap}" + (" (estimate is over the cap)" if tokens > cap else "") if cap else "none set"))
 

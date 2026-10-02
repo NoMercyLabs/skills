@@ -97,7 +97,7 @@ class ModelPlanTests(CrucibleCase):
             run(root3, "grant", group, "no", "--words", "x")
         code, out, err = run(root3, "confirm")
         self.assertEqual(code, 1)
-        self.assertIn("models", err)
+        self.assertIn("models.fable", err)
 
     def test_fable_only_for_listed_complex_tasks(self):
         root = self.setup_root()

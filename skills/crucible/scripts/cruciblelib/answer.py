@@ -14,6 +14,7 @@ INTERVIEW_ORDER = CONFIG_KEYS + tuple(PREFIX + group for group in GROUPS)
 
 # A policy answer is the user's decision about their own system or risk: it carries their words.
 # Plain facts (scope, goals, stages, tracker, advisories, owners, privacy words, budget) may go without.
+SETTING_KEYS = ("board_dates",)
 POLICY_KEYS = ("auto_file", "blocker_fixes", "memory", "live_checks", "backups", "knowledge_sources", "models",
                "visibility", "private_destination", "workspace")
 
@@ -22,6 +23,7 @@ CHOICES = {
     "blocker_fixes.landing": ("pr", "local_branch", "push_branch"),
     "memory.kind": ("grimoira", "none"),
     "private_destination.kind": vis.PRIVATE_DESTINATIONS,
+    "board_dates": ("none", "estimates"),
 }
 VISIBILITY_FLAGS = ("pointers", "public_board_items", "collaborators_see_security")
 
@@ -47,7 +49,7 @@ def unanswered(cfg):
 
 
 def missing_for_confirm(cfg):
-    required = ("auto_file", "blocker_fixes", "visibility", "private_destination", "workspace") + INTERVIEW_ORDER[len(CONFIG_KEYS):]
+    required = ("auto_file", "blocker_fixes", "models.fable", "visibility", "private_destination", "workspace") + INTERVIEW_ORDER[len(CONFIG_KEYS):]
     return [key for key in required if not is_answered(cfg, key)]
 
 
@@ -61,6 +63,8 @@ def parse_value(text):
 def check_value(key, value):
     if key == "auto_file" and not isinstance(value, bool):
         raise CrucibleError("auto_file is true or false")
+    if key == "models.fable" and not isinstance(value, bool):
+        raise CrucibleError("models.fable is yes or no: may the complex jobs use the top tier?")
     if key in CHOICES and value not in CHOICES[key]:
         raise CrucibleError(f"{key} is one of: {', '.join(CHOICES[key])}")
     if key.startswith("visibility."):
@@ -96,11 +100,13 @@ def set_answer(root, key, value, words=""):
     top = parts[0]
     if top == "permissions":
         raise CrucibleError(f"{key}: permission groups are answered with `crucible grant GROUP yes|no`")
-    if top not in CONFIG_KEYS:
-        raise CrucibleError(f"unknown key {top!r}: use one of {', '.join(CONFIG_KEYS)}")
+    if top not in CONFIG_KEYS + SETTING_KEYS:
+        raise CrucibleError(f"unknown key {top!r}: use one of {', '.join(CONFIG_KEYS + SETTING_KEYS)}")
     if top in POLICY_KEYS and not (words or "").strip():
         raise CrucibleError(f"refused: {top} is the user's decision: ask the user, then record their own words "
                             f"with --words")
+    if key == "models.fable" and value in ("yes", "no"):
+        value = value == "yes"
     check_value(key, value)
     cfg = root.config()
     node = cfg

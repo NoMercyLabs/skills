@@ -81,7 +81,11 @@ class CrucibleCase(unittest.TestCase):
             self.assertEqual(code, 0, err)
         self.answer_visibility(root)
         self.answer_workspace(root)
-        code, out, err = run(root, "answer", "models.fable", "false", "--words", "test default")
+        self.answer_fable(root)
+
+    def answer_fable(self, root, value="false"):
+        """The Fable question: may the complex jobs use the top tier."""
+        code, out, err = run(root, "answer", "models.fable", value, "--words", "test default")
         self.assertEqual(code, 0, err)
 
     def answer_workspace(self, root):
