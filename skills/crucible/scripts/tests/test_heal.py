@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from cruciblelib import heal
+from cruciblelib import heal, lessons
 from cruciblelib.common import Root, read_json
 from cruciblelib.permissions import read_log
 
@@ -66,6 +66,48 @@ class HealTests(CrucibleCase):
         out = heal.recover(self.root, "other-u04", failed(output="token lacks the required scope"), runner)
         self.assertEqual((runner.calls, out["result"]), ([], "stopped"))
         self.assertIn("refresh", out["hint"])
+
+    def lesson(self, change):
+        lessons.save(self.root, {"id": "L-cccc3333", "target": "audit", "kind": "failure_signature", "signature": "s",
+                                 "state": "active", "evidence": {"count": 3, "records": []}, "change": change})
+
+    def test_failure_signature_lesson_used_by_heal(self):
+        facts = failed(output="error: disk quota exceeded")
+        runner = Runner()
+        self.assertEqual(heal.recover(self.root, "other-u01", facts, runner)["result"], "reported")
+        self.assertEqual(runner.calls, [])
+        self.lesson({"failure_signature": "disk quota exceeded", "recovery": "rerun_once"})
+        runner = Runner()
+        out = heal.recover(self.root, "other-u02", facts, runner)
+        self.assertEqual((out["class"], out["result"], runner.calls), ("unknown", "healed", [("other-u02", {})]))
+        runner = Runner()
+        out = heal.recover(self.root, "other-u03", failed(output="rate limit, disk quota exceeded"), runner)
+        self.assertEqual((out["result"], runner.calls), ("healed", [("other-u03", {})]))
+        self.lesson({"failure_signature": "disk quota exceeded", "recovery": "report"})
+        runner = Runner()
+        out = heal.recover(self.root, "other-u04", failed(truncated=True, output="disk quota exceeded"), runner)
+        self.assertEqual((out["result"], runner.calls), ("reported", []))
+
+    def lesson(self, change):
+        lessons.save(self.root, {"id": "L-cccc3333", "target": "audit", "kind": "failure_signature", "signature": "s",
+                                 "state": "active", "evidence": {"count": 3, "records": []}, "change": change})
+
+    def test_failure_signature_lesson_used_by_heal(self):
+        facts = failed(output="error: disk quota exceeded")
+        runner = Runner()
+        self.assertEqual(heal.recover(self.root, "other-u01", facts, runner)["result"], "reported")
+        self.assertEqual(runner.calls, [])
+        self.lesson({"failure_signature": "disk quota exceeded", "recovery": "rerun_once"})
+        runner = Runner()
+        out = heal.recover(self.root, "other-u02", facts, runner)
+        self.assertEqual((out["class"], out["result"], runner.calls), ("unknown", "healed", [("other-u02", {})]))
+        runner = Runner()
+        out = heal.recover(self.root, "other-u03", failed(output="rate limit, disk quota exceeded"), runner)
+        self.assertEqual((out["result"], runner.calls), ("healed", [("other-u03", {})]))
+        self.lesson({"failure_signature": "disk quota exceeded", "recovery": "report"})
+        runner = Runner()
+        out = heal.recover(self.root, "other-u04", failed(truncated=True, output="disk quota exceeded"), runner)
+        self.assertEqual((out["result"], runner.calls), ("reported", []))
 
     def test_recovery_max_two_tries_then_blocked(self):
         runner = Runner(ok=False)

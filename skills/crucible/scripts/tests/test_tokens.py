@@ -3,7 +3,7 @@ import math
 import os
 import re
 
-from cruciblelib import tokens
+from cruciblelib import lessons, tokens
 from cruciblelib.common import Root
 from cruciblelib.models import plan_for
 from cruciblelib.transcripts import read_usage
@@ -83,6 +83,24 @@ class TokenTests(CrucibleCase):
         path = make_transcript(os.path.join(self.tmp(), f"{unit['unit']}.jsonl"), turns, total, OUTPUT)
         code, out, err = run(root, "calibrate", "--unit", unit["unit"], "--transcript", path)
         return code, out, err, total
+
+    def test_forecast_lesson_changes_estimate(self):
+        root, units = self.setup_audit()
+        path = write_calibration(os.path.join(self.tmp(), "c.json"), flat_terms(tokens_per_line=10))
+        code, before, err = run(root, "tokens", "--calibration", path)
+        self.assertEqual(code, 0, err)
+        flat = run(root, "estimate")[1]
+        lessons.save(Root(root), {"id": "L-dddd4444", "target": "audit", "kind": "hand", "signature": "s",
+                                  "state": "active", "evidence": {"count": 3, "records": []},
+                                  "change": {"forecast_factor": 2}})
+        code, after, err = run(root, "tokens", "--calibration", path)
+        self.assertEqual(code, 0, err)
+        self.assertEqual(number(after, "estimate"), 2 * number(before, "estimate"))
+        self.assertEqual(number(after, "reader tokens"), 2 * number(before, "reader tokens"))
+        scaled = run(root, "estimate")[1]
+        self.assertEqual(number(scaled, "reader tokens"), 2 * number(flat, "reader tokens"))
+        total = [int(re.search(r"(?m)^tokens: (\d+)", text).group(1)) for text in (flat, scaled)]
+        self.assertEqual(total[1], 2 * total[0])
 
     def test_estimate_includes_start_cost_and_turns(self):
         root, units = self.setup_audit()

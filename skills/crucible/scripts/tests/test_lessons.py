@@ -6,6 +6,7 @@ from unittest import mock
 
 from cruciblelib import lessons
 from cruciblelib.common import CrucibleError, Root
+from cruciblelib.models import plan_for
 from cruciblelib.permissions import log_action
 
 from .helpers import CrucibleCase, run
@@ -224,6 +225,38 @@ class ActiveLessonReadByEngineTests(CrucibleCase):
         save_lesson(Root(root), self.lesson("active"))
         self.assertEqual(run(root, "inventory")[0], 0)
         self.assertEqual(self.unit_addendum(root), ["Check the error branch first."])
+
+
+def activate(root, change, lesson_id="L-bbbb2222"):
+    lessons.save(Root(root), {"id": lesson_id, "target": "audit", "kind": "hand", "signature": "s",
+                              "state": "active", "evidence": {"count": 3, "records": []}, "change": change})
+
+
+class ActiveLessonTunesPlanTests(LessonCase):
+    FILES = {"a.py": "x = 1\n" * 40, "b.py": "y = 2\n" * 40}
+
+    def test_lesson_unit_size_shrinks_units(self):
+        root, _ = self.make_root(self.FILES, config={"unit_bytes": 480})
+        self.assertEqual(len(plan_for(Root(root))["units"]), 1)
+        activate(root, {"unit_size_factor": 0.5})
+        self.assertEqual(len(plan_for(Root(root))["units"]), 2)
+        self.assertEqual(run(root, "inventory")[0], 0)
+        self.assertEqual(len(Root(root).units()), 2)
+
+    def test_lesson_model_tier_picks_reader(self):
+        root, _ = self.make_root(self.FILES, config={"unit_bytes": 480})
+        before = plan_for(Root(root))["units"][0]
+        self.assertEqual(before["risk"], "normal")
+        activate(root, {"model_tier": {"normal": "strong"}})
+        after = plan_for(Root(root))["units"][0]
+        self.assertNotEqual(before["reader_tier"], "strong")
+        self.assertEqual(after["reader_tier"], "strong")
+
+    def test_model_tier_lesson_names_only_risk_classes(self):
+        root, _ = self.audit()
+        self.write_lesson(root, "L-badrisk", {"model_tier": {"mystery": "fast"}})
+        with self.assertRaises(CrucibleError):
+            lessons.load_lesson(Root(root), "L-badrisk")
 
 
 class GeneralFlagSetByScriptTests(CrucibleCase):
