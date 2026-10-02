@@ -13,7 +13,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from cruciblelib import selftest  # noqa: E402
-from cruciblelib.common import read_json, source_id, write_json  # noqa: E402
+from cruciblelib.common import source_id, write_json  # noqa: E402
 
 ACCEPTED = ("D01", "D02", "D05")
 REJECTED_FILE, REJECTED_LINE = "app/config.py", 1
@@ -57,7 +57,7 @@ def candidate(repo, goal, defect, ref, text, symptom):
 def build():
     work = os.path.join(tempfile.mkdtemp(prefix="crucible-replay-"), "run")
     root = selftest.prepare(work)
-    expected = {d["id"]: d for d in read_json(selftest.EXPECTED)}
+    expected = {d["id"]: d for d in selftest.load_expected()[0]}
     goals = {g["name"].lower(): g["id"] for g in root.config()["goals"]}
     for unit in root.units():
         data = root.unit(unit)

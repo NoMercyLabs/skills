@@ -10,6 +10,12 @@ Three modes:
                          own `show` output on every run, because stamps are keyed per audit folder.
   --root DIR --score     matches the accepted findings of a run folder against fixtures/seeded/EXPECTED.json
                          by file and line range, and checks coverage and proof per unit.
+
+EXPECTED.json is either a list of seeded defects, or an object {"defects": [...], "known_extras": [...]}.
+A seeded defect is {id, file, line_start, line_end, goal, summary}. A known extra is a real defect in the
+fixture that is not seeded: {file, line_start, line_end, title}. An accepted finding that overlaps a seeded
+defect counts as found. One that overlaps only a known extra is reported as "extra (known)" and is not
+invented. Any other accepted finding is invented and fails the selftest.
 """
 import contextlib
 import io
@@ -185,22 +191,37 @@ def finding_spans(finding):
     return spans
 
 
+def load_expected():
+    """(seeded defects, known extras) from EXPECTED.json, in either of its two shapes."""
+    data = read_json(EXPECTED)
+    if isinstance(data, dict):
+        return data.get("defects", []), data.get("known_extras", [])
+    return data, []
+
+
+def overlaps(entry, spans):
+    return any(path == entry["file"] and a <= entry["line_end"] and entry["line_start"] <= b
+               for path, a, b in spans)
+
+
 def cmd_score(root):
     root.require_confirmed()
-    expected = read_json(EXPECTED)
+    expected, known_extras = load_expected()
     findings = root.findings()
-    found, invented = {}, []
+    found, invented, extra = {}, [], []
     for fid, finding in findings.items():
-        hits = [d["id"] for d in expected for path, a, b in finding_spans(finding)
-                if path == d["file"] and a <= d["line_end"] and d["line_start"] <= b]
+        spans = finding_spans(finding)
+        hits = [d["id"] for d in expected if overlaps(d, spans)]
         if not hits:
-            invented.append(fid)
+            (extra if any(overlaps(e, spans) for e in known_extras) else invented).append(fid)
         for hit in hits:
             found.setdefault(hit, fid)
     missed = [d["id"] for d in expected if d["id"] not in found]
     print(f"found {len(found)} of {len(expected)}" + (f" ({', '.join(sorted(found))})" if found else ""))
     print(f"missed {len(missed)}" + (f": {', '.join(missed)}" if missed else ""))
-    print(f"invented {len(invented)}" + (f" ({', '.join(invented)})" if invented else ""))
+    if known_extras:
+        print(f"extra (known) {len(extra)}" + (f" ({', '.join(extra)})" if extra else ""))
+    print(f"invented {len(invented)}" +(f" ({', '.join(invented)})" if invented else ""))
     counts, _ = coverage_counts(root)
     total = sum(counts.values())
     covered = counts.get("done", 0) + counts.get("carried", 0)
