@@ -26,17 +26,17 @@ DOMAIN_WORDS = re.compile(
 )
 # Names and tooling of the home projects. The private words are stored only as
 # sha256 digests of the lowercased word, so this public file does not name them.
-# Add one: python -c "import hashlib;print(hashlib.sha256(b'word').hexdigest())"
+# Add one: python -c "import hashlib;print(hashlib.sha256(b'word').hexdigest()[:32])"
 # A line is refused when any run of 5 or more letters or digits inside one of
 # its words hashes into the set: that also catches a compound such as word84.
 HOME_DIGESTS = frozenset(
     {
-        "d63f4a0cdaab52726d1ce895e4ac8c3507049e617b0a97d0a0af508bdad34a8d",
-        "7becf04360b642f45b6fb7f7ce10dadfc51bd5b6154373065ee35e690ed37c63",
-        "dda3dabc3a047166da03ca66d076cc5a7faebd7981dea4a693b21c7d1734dff4",
-        "d0348826f00b8dabd3c9d9e59992715711e11176f98764a6c4a5899d28ca6fc6",
-        "fc3a2603a0795a7d1b192704a3af95fa661e1c5bc63b393ebf75904fa53d3683",
-        "8d239f1bb5df744444daa2e2a7f3a21990c1f80e87bbca1340ddc95881b14c13",
+        "d63f4a0cdaab52726d1ce895e4ac8c35",
+        "7becf04360b642f45b6fb7f7ce10dadf",
+        "dda3dabc3a047166da03ca66d076cc5a",
+        "d0348826f00b8dabd3c9d9e599927157",
+        "fc3a2603a0795a7d1b192704a3af95fa",
+        "8d239f1bb5df744444daa2e2a7f3a219",
     }
 )
 MIN_PART = 5
@@ -72,7 +72,7 @@ def hashed_hits(line: str) -> list[str]:
         for start in range(len(word)):
             for end in range(start + MIN_PART, len(word) + 1):
                 part = word[start:end]
-                if hashlib.sha256(part.encode()).hexdigest() in HOME_DIGESTS:
+                if hashlib.sha256(part.encode()).hexdigest()[:32] in HOME_DIGESTS:
                     hits.append(part)
     return hits
 

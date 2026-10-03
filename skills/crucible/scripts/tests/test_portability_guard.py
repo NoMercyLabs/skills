@@ -20,12 +20,12 @@ GUARD = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Independent copy of the digests, so this test is red when a plain word is in the source.
 KNOWN = {
-    "d63f4a0cdaab52726d1ce895e4ac8c3507049e617b0a97d0a0af508bdad34a8d",
-    "7becf04360b642f45b6fb7f7ce10dadfc51bd5b6154373065ee35e690ed37c63",
-    "dda3dabc3a047166da03ca66d076cc5a7faebd7981dea4a693b21c7d1734dff4",
-    "d0348826f00b8dabd3c9d9e59992715711e11176f98764a6c4a5899d28ca6fc6",
-    "fc3a2603a0795a7d1b192704a3af95fa661e1c5bc63b393ebf75904fa53d3683",
-    "8d239f1bb5df744444daa2e2a7f3a21990c1f80e87bbca1340ddc95881b14c13",
+    "d63f4a0cdaab52726d1ce895e4ac8c35",
+    "7becf04360b642f45b6fb7f7ce10dadf",
+    "dda3dabc3a047166da03ca66d076cc5a",
+    "d0348826f00b8dabd3c9d9e599927157",
+    "fc3a2603a0795a7d1b192704a3af95fa",
+    "8d239f1bb5df744444daa2e2a7f3a219",
 }
 
 
@@ -34,7 +34,7 @@ def plain_hits(text: str) -> list[str]:
     for word in re.findall(r"[a-z0-9]+", text.lower()):
         for start in range(len(word)):
             for end in range(start + 5, len(word) + 1):
-                if hashlib.sha256(word[start:end].encode()).hexdigest() in KNOWN:
+                if hashlib.sha256(word[start:end].encode()).hexdigest()[:32] in KNOWN:
                     hits.append(word[start:end])
     return hits
 
