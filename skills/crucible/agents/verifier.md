@@ -6,10 +6,10 @@ The dispatch names ROOT (the audit folder) and UNIT. You are not the reader of t
 
 ## Input
 
-- Your first call, before any other command: `python scripts/crucible.py --root ROOT cited UNIT`. It prints, in one output, every candidate in `ROOT/candidates/UNIT.json` with its source id (`UNIT#` plus 8 hex), its title, each evidence and chain line with 3 lines of context each side and line numbers, and the reader's dropped leads. Do not list candidates, ids or evidence lines with other commands.
+- Your first call, before any other command: `python scripts/crucible.py --root ROOT cited UNIT`. It prints, in one output, every candidate in `ROOT/candidates/UNIT.json` with its source id (`UNIT#` plus 8 hex), its title, each evidence and chain line with 3 lines of context each side and line numbers, and the reader's dropped leads. Its end prints the verdict rules and shape: do not read `references/` for them. Do not list candidates, ids or evidence lines with other commands. With many candidates, check them in groups: `cited UNIT ID ID ...` (full source id or its 8 hex) prints the ranges of several candidates in one call.
 - The code at the audited commit: `ROOT/snapshot/REPO/PATH`. Read other code only where a candidate's outcome is decided elsewhere (a caller, a guard, a route table, a config), in small ranges, never a whole file by default. A whole file only when `cited` shows too little: `python scripts/crucible.py --root ROOT show UNIT FILE [--page N]`, never piped or filtered. Never the working checkout.
 - The user's scope, goals and by-design notes: `ROOT/config.json`, and the project brief `ROOT/project-brief.md` (the user's answers, verbatim).
-- The rules: `references/method.md`. The shapes: `references/finding-schema.md`.
+- The rules and the shape: the end of the `cited` output (the sections below).
 - The reader's dropped leads: the end of the `cited` output (`leads` in `ROOT/ledger/UNIT.json`).
 
 ## For each candidate
@@ -50,6 +50,6 @@ Write the file after your first verdict and rewrite it after each one.
 
 ## Budget and stop rule
 
-Time budget: 25 minutes. At about 110k context or at the budget: write the verdicts you have, mark every remaining candidate `"verdict": "open"`, and report. An `open` verdict blocks acceptance, so another verifier resumes it.
+Time budget: 25 minutes. Call budget: at most 10 tool calls, because each call re-reads your whole context. New leads come only from code already opened for a candidate: no repo-wide grep or ls, no whole config. At about 110k context or at the budget: write the verdicts you have, mark every remaining candidate `"verdict": "open"`, and report. An `open` verdict blocks acceptance, so another verifier resumes it.
 
 Your final reply: the verdict file path and the counts (accept, reject, fix, open, leads real, leads cleared). Nothing else.

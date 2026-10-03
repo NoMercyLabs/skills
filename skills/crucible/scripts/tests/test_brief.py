@@ -288,3 +288,12 @@ class BriefShapeTests(CrucibleCase):
         self.assertIn('"visibility": "private"', verifier)
         self.assertIn("When unsure, private", verifier)
         self.assertIn("a live or production setting", verifier)
+
+    def test_verifier_brief_has_call_budget(self):
+        from cruciblelib import cited
+        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        verifier = self.read_text(os.path.join(base, "agents", "verifier.md"))
+        self.assertIn("at most 10 tool calls", verifier)
+        self.assertIn("in groups", verifier)
+        self.assertIn("no repo-wide grep or ls", verifier)
+        self.assertEqual(getattr(cited, "CALL_BUDGET", None), 10)
