@@ -115,8 +115,9 @@ Balanced tier:
 - Recall: 12 of 12 (found 12 of 12 seeded).
 - Invented findings: 0.
 - Coverage: 100 percent.
-- Cost: 5,362,016 tokens.
-- Cost by usage field: input 148, cache write 341,954, cache read 4,950,263, output 69,651, total 5,362,016 tokens.
+- Cost: 3,450,797 tokens.
+- Cost by usage field: input 104, cache write 299,879, cache read 3,101,850, output 48,964, total 3,450,797 tokens.
+- Known extra findings: 7.
 - Forecast error: 0.0.
 - Result: SELFTEST PASS.
 
@@ -145,7 +146,16 @@ A forecast error of 0.0 does not prove the forecast.
 The first-try forecast errors were -0.5181 for balanced and -0.4215 for fast.
 The verifier default was far below the measured verifier use.
 The refit fixed the verifier cost.
-For the balanced tier, the verifier start cost went from 12,000 to 1,739,124 tokens.
+For the balanced tier, the verifier cost per candidate went from 2,500 to 124,635 tokens, and its start cost went from 12,000 to 0.
+
+The verifier brief changed after that first balanced run.
+The cited command now prints the verdict rules, so the verifier makes fewer tool calls.
+The balanced run cost 5,362,016 tokens before the change and 3,450,797 after it.
+The verifier for the first unit used 1,665,289 tokens before and 1,219,736 after.
+That unit includes two resumes after its appended candidate failed the gate; its first 9 tool calls cost 658,622.
+The verifier for the second unit used 1,812,959 tokens before and 347,293 after.
+An earlier run, before the brief change, used 1,313,708 and 1,483,392 tokens for the two units.
+The full history is under `history` in `references/calibration.json`.
 
 ## Self-heal and lessons
 
