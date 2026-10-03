@@ -180,3 +180,29 @@ class PlacementTests(FilingCase):
         self.assertEqual(code, 1)
         self.assertIn("text of private finding F-0002 is in a public place", out)
         self.assertNotIn(json.dumps(PRIVATE_SUMMARY), err)
+
+
+class ForcedPrivateAcceptTests(CrucibleCase):
+    def accepted(self, **over):
+        from .helpers import src, verdict
+        a = good_finding(PRIVATE_TITLE, **over)
+        if a["visibility"] is None:
+            del a["visibility"]
+        root, unit = self.prepared_unit([a], {src("svc-u01", a): verdict(checked=["app.py:2", "app.py:3"])})
+        code, out, err = run(root, "accept", unit)
+        return root, code, out + err
+
+    def test_forced_private_set_by_engine(self):
+        from cruciblelib.permissions import read_log
+        root, code, out = self.accepted(visibility="public")
+        self.assertEqual(code, 0, out)
+        found = list(Root(root).findings().values())
+        self.assertEqual([f["visibility"] for f in found], ["private"])
+        rows = [r for r in read_log(Root(root)) if "visibility" in r["command"] and r["status"] == "ok"]
+        self.assertTrue(rows, read_log(Root(root)))
+        self.assertIn("exploitable", rows[0]["result"])
+
+    def test_forced_private_set_by_engine_when_unset(self):
+        root, code, out = self.accepted(visibility=None)
+        self.assertEqual(code, 0, out)
+        self.assertEqual([f["visibility"] for f in Root(root).findings().values()], ["private"])
