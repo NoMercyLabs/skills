@@ -191,3 +191,21 @@ class Root:
             data = read_json(path)
             out[data.get("id") or os.path.basename(path)[:-5]] = data
         return out
+
+
+def replaced_tokens(ledger):
+    """Tokens of records a later measurement replaced: the agent run happened and was paid for, so it still counts."""
+    return sum(r["tokens"] for r in ledger.get("replaced", []))
+
+
+def ledger_total(ledger):
+    return sum(r["tokens"] for r in ledger["records"]) + replaced_tokens(ledger)
+
+
+def tokens_spent(root):
+    """Every token spent, read from the ledger (kept records plus replaced ones) and nowhere else. A run folder with
+    no ledger yet falls back to the `tokens_spent` an older engine stored in state.json."""
+    ledger = read_json(root.p("tokens.json"), None)
+    if ledger is None:
+        return root.state().get("tokens_spent", 0)
+    return ledger_total(ledger)

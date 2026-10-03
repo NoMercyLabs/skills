@@ -170,7 +170,7 @@ class TokenTests(CrucibleCase):
         with open(os.path.join(root, "tokens.json"), encoding="utf-8") as fh:
             record = json.load(fh)["records"][0]
         self.assertEqual(record["tokens"], total)
-        self.assertEqual(Root(root).state()["tokens_spent"], total)
+        self.assertEqual(tokens.tokens_spent(Root(root)), total)
         with self.assertRaises(SystemExit):
             run(root, "calibrate", "--unit", units[0]["unit"], "--transcript", path, "--tokens", "5")
         empty = os.path.join(self.tmp(), "empty.jsonl")
