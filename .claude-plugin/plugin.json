@@ -1,8 +1,8 @@
 {
   "name": "nomercylabs",
   "displayName": "NoMercy Labs skills",
-  "version": "1.3.0",
-  "description": "Every NoMercy Labs skill in one plugin: atlas documents a whole project as one system, devbox-anywhere builds a containerized dev environment from what the repo actually uses.",
+  "version": "1.4.0",
+  "description": "Every NoMercy Labs skill in one plugin: atlas documents a whole project as one system, devbox-anywhere builds a containerized dev environment from what the repo actually uses, crucible audits a whole system and verifies every defect it files.",
   "author": { "name": "NoMercy Labs", "url": "https://github.com/NoMercyLabs" },
   "homepage": "https://github.com/NoMercyLabs/skills",
   "repository": "https://github.com/NoMercyLabs/skills",
