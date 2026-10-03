@@ -247,7 +247,8 @@ def leave_failed_fix(root, repo, branch, copies, created):
 
 
 def commit_fix(root, row, plan, repo, branch):
-    """Commit the touched files on the fix branch, as the user's own git config says."""
+    """Commit the touched files on the fix branch as the user's own git identity: GIT_AUTHOR_* and GIT_COMMITTER_*
+    when set, else the git config, as git itself decides."""
     files = [touch_path(t) for t in plan["touches"] if os.path.isfile(os.path.join(repo, *touch_path(t).split("/")))]
     title = f"fix({row['stage'] or 'audit'}): {row['id']} {row['description']}"
 

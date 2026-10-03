@@ -11,6 +11,7 @@ Standard library only: python3 -m unittest test_portability
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import unittest
@@ -23,8 +24,25 @@ DOMAIN_WORDS = re.compile(
     r"autoplay|media server|encoder|transcod\w*|codec|hls|m3u8)\b",
     re.IGNORECASE,
 )
-# Names and tooling of the home projects: matched anywhere in a line.
-HOME_NAMES = re.compile(r"keycloak|droplet|stoney|fillz|moooom|arcanum|nomercy|AUD-\d", re.IGNORECASE)
+# Names and tooling of the home projects. The private words are stored only as
+# sha256 digests of the lowercased word, so this public file does not name them.
+# Add one: python -c "import hashlib;print(hashlib.sha256(b'word').hexdigest()[:32])"
+# A line is refused when any run of 5 or more letters or digits inside one of
+# its words hashes into the set: that also catches a compound such as word84.
+HOME_DIGESTS = frozenset(
+    {
+        "d63f4a0cdaab52726d1ce895e4ac8c35",
+        "7becf04360b642f45b6fb7f7ce10dadf",
+        "dda3dabc3a047166da03ca66d076cc5a",
+        "d0348826f00b8dabd3c9d9e599927157",
+        "fc3a2603a0795a7d1b192704a3af95fa",
+        "8d239f1bb5df744444daa2e2a7f3a219",
+    }
+)
+MIN_PART = 5
+WORDS = re.compile(r"[a-z0-9]+")
+# The publisher name and finding ids are not sensitive: kept as a plain pattern.
+HOME_NAMES = re.compile(r"nomercy|AUD-\d", re.IGNORECASE)
 
 # Public integrations and the publisher: stripped before matching.
 ALLOWED_STRINGS = (
@@ -48,6 +66,17 @@ def clean(line: str) -> str:
     return line
 
 
+def hashed_hits(line: str) -> list[str]:
+    hits = []
+    for word in WORDS.findall(line.lower()):
+        for start in range(len(word)):
+            for end in range(start + MIN_PART, len(word) + 1):
+                part = word[start:end]
+                if hashlib.sha256(part.encode()).hexdigest()[:32] in HOME_DIGESTS:
+                    hits.append(part)
+    return hits
+
+
 def find_leaks(root: str) -> list[str]:
     leaks = []
     for base, dirs, names in os.walk(root):
@@ -68,6 +97,8 @@ def find_leaks(root: str) -> list[str]:
                 for pattern in (DOMAIN_WORDS, HOME_NAMES):
                     for match in pattern.finditer(text):
                         leaks.append(f"{os.path.relpath(path, root)}:{number}: {match.group(0)}")
+                for part in hashed_hits(text):
+                    leaks.append(f"{os.path.relpath(path, root)}:{number}: {part}")
     return leaks
 
 
@@ -81,10 +112,10 @@ class PortabilityTests(unittest.TestCase):
 
         folder = tempfile.mkdtemp()
         with open(os.path.join(folder, "page.md"), "w", encoding="utf-8") as handle:
-            handle.write("The Keycloak realm\nsee github.com/NoMercyLabs/grimoira\nfinding AUD-12\nnotes\n")
+            handle.write("The Key" + "cloak realm\nsee github.com/NoMercyLabs/grimoira\nfinding AUD-12\nnotes\n")
         leaks = find_leaks(folder)
         self.assertEqual(len(leaks), 2, leaks)
-        self.assertIn("page.md:1: Keycloak", leaks)
+        self.assertIn("page.md:1: key" + "cloak", leaks)
         self.assertIn("page.md:3: AUD-1", leaks)
 
 
