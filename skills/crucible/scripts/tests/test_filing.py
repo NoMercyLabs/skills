@@ -32,8 +32,15 @@ class FakeGh:
         if head == ["project", "view"]:
             return json.dumps({"public": self.boards[(args[args.index("--owner") + 1], args[2])] == "public"})
         if head == ["label", "create"]:
-            self.labels.append((args[args.index("--repo") + 1], args[2]))
+            row = (args[args.index("--repo") + 1], args[2])
+            if row in self.labels:
+                # Real gh refuses a label the repo already has.
+                raise CrucibleError(f'gh label create failed: label with name "{row[1]}" already exists')
+            self.labels.append(row)
             return ""
+        if head == ["label", "list"]:
+            repo = args[args.index("--repo") + 1]
+            return "".join(f"{name}\n" for slug, name in self.labels if slug == repo)
         if head == ["issue", "create"]:
             url = f"fake-issue-{len(self.issues) + 1}"
             self.issues[url] = {"repo": args[args.index("--repo") + 1], "title": args[args.index("--title") + 1],
@@ -199,6 +206,30 @@ class DryRunApplyTests(FilingCase):
         self.assertEqual(self.log_rows(root)[-1]["status"], "refused")
 
     def test_a_label_outside_the_grant_is_refused(self):
+        root = self.ready([self.finding(1, labels=["wontfix"])], auto="true")
+        self.dry_run_hash(root)
+        code, out, err = run(root, "file", "--apply")
+        self.assertEqual(code, 1)
+        self.assertIn("labels wontfix not granted", err)
+        self.assertEqual(self.gh.created(), [])
+
+    def test_issues_that_share_a_label_are_all_filed(self):
+        titles = ["Handler reads its token path unchecked", "Second handler also reads it unchecked",
+                  "Worker reads its token path unchecked"]
+        root = self.ready([self.finding(n, title=t, labels=["bug"]) for n, t in enumerate(titles, 1)], auto="true")
+        self.filed_everything(root)
+        self.assertEqual(len(self.gh.issues), 3)
+        self.assertEqual(self.gh.labels, [("acme/svc", "bug")])
+
+    def test_a_label_the_repo_already_has_is_not_created_again(self):
+        self.gh.labels.append(("acme/svc", "bug"))
+        root = self.ready([self.finding(1, labels=["bug"])], auto="true")
+        self.filed_everything(root)
+        self.assertEqual(len(self.gh.issues), 1)
+        self.assertEqual([c for c in self.gh.calls if c[:2] == ["label", "create"]], [])
+
+    def test_a_label_outside_the_grant_is_refused_even_when_the_repo_has_it(self):
+        self.gh.labels.append(("acme/svc", "wontfix"))
         root = self.ready([self.finding(1, labels=["wontfix"])], auto="true")
         self.dry_run_hash(root)
         code, out, err = run(root, "file", "--apply")

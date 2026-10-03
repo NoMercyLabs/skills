@@ -16,6 +16,10 @@ class Tracker:
     def board_visibility(self, owner, number):
         raise NotImplementedError
 
+    def labels(self, slug):
+        """The label names the repo has right now."""
+        raise NotImplementedError
+
     def create_label(self, slug, label):
         raise NotImplementedError
 

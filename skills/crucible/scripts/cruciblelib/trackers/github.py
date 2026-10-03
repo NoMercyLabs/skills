@@ -63,6 +63,10 @@ class GitHub(Tracker):
             raise CrucibleError(f"the gh token lacks the scope {', '.join(lacking)}: run `{refresh_hint(lacking)}` "
                                 "yourself, then try again")
 
+    def labels(self, slug):
+        out = run_gh(["label", "list", "--repo", slug, "--limit", "1000", "--json", "name", "--jq", ".[].name"])
+        return {line.strip() for line in out.splitlines() if line.strip()}
+
     def create_label(self, slug, label):
         run_gh(["label", "create", label, "--repo", slug])
 

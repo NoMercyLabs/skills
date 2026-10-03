@@ -8,7 +8,7 @@ import os
 import re
 import subprocess
 
-from .common import CrucibleError
+from .common import CrucibleError, repo_env
 from .permissions import authorize, run_action
 
 
@@ -19,7 +19,8 @@ def ls_remote_branch(root, source):
     except CrucibleError:
         return "unknown (not looked up: no workspace_clones permission)"
     try:
-        done = subprocess.run(["git", "ls-remote", "--symref", source, "HEAD"], capture_output=True, text=True, timeout=60)
+        done = subprocess.run(["git", "ls-remote", "--symref", source, "HEAD"], env=repo_env(), capture_output=True,
+                              text=True, timeout=60)
     except (OSError, subprocess.SubprocessError):
         return "unknown"
     match = re.search(r"ref: refs/heads/(\S+)\s+HEAD", done.stdout)
@@ -37,7 +38,7 @@ def clone_repos(root, rows, base, finish, group="workspace_clones", **want):
         os.makedirs(os.path.dirname(rows[0]["dest"]), exist_ok=True)
         for row in rows:
             out = subprocess.run(["git", "clone", "--quiet", "--no-hardlinks", "--", row["source"], row["dest"]],
-                                 capture_output=True, text=True, timeout=1800)
+                                 env=repo_env(), capture_output=True, text=True, timeout=1800)
             if out.returncode != 0:
                 raise CrucibleError(f"git clone of {row['source']} failed: {out.stderr.strip()}")
             finish(row)
@@ -52,8 +53,8 @@ def clone_repos(root, rows, base, finish, group="workspace_clones", **want):
 def push_branch(root, repo, branch):
     """Push one local branch to the repo's origin, only inside the blocker_pushes grant."""
     def action():
-        out = subprocess.run(["git", "-C", repo, "push", "--quiet", "origin", branch], capture_output=True, text=True,
-                             timeout=300)
+        out = subprocess.run(["git", "-C", repo, "push", "--quiet", "origin", branch], env=repo_env(),
+                             capture_output=True, text=True, timeout=300)
         if out.returncode != 0:
             raise CrucibleError(f"git push of {branch} failed: {out.stderr.strip()[-300:]}")
         return f"pushed {branch}"

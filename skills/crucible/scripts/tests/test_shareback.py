@@ -50,6 +50,18 @@ class ShareBackTests(CrucibleCase):
         with self.assertRaises(CrucibleError):
             shareback.offer(self.root, lesson(change={"model_tier": PLANTED[4]}))
 
+    def test_share_back_refuses_a_draft_with_a_privacy_word(self):
+        cfg = self.root.config()
+        cfg["privacy_words"] = ["acme"]
+        self.root.save_config(cfg)
+        shareback.enable(self.root, "the user said so")
+        with self.assertRaises(CrucibleError) as caught:
+            shareback.offer(self.root, lesson(change={"recovery": "acme_retry"}))
+        self.assertIn("privacy word acme", str(caught.exception))
+        with self.assertRaises(CrucibleError):
+            shareback.answer(self.root, lesson(change={"recovery": "acme_retry"}), "yes", "go ahead")
+        self.assertIn("unit_size_factor", shareback.offer(self.root, lesson())["text"])
+
     def test_share_back_needs_yes(self):
         shareback.enable(self.root, "the user said so")
         with self.assertRaises(CrucibleError):

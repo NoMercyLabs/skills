@@ -7,7 +7,7 @@ import subprocess
 
 from . import brief, clones, rootcause
 from .backup import backup
-from .common import GIT_NETWORK_VERBS, NETWORK_PROGRAMS, CrucibleError, Root, read_json, write_json
+from .common import GIT_NETWORK_VERBS, NETWORK_PROGRAMS, CrucibleError, Root, read_json, repo_env, write_json
 from .permissions import authorize, log_action, now, refuse, run_action
 from .trackers import github
 from .visibility import repo_slug
@@ -178,7 +178,8 @@ def cmd_fix_plan(args):
 
 def run_command(argv, repo):
     try:
-        done = subprocess.run([*argv], cwd=repo, capture_output=True, text=True, timeout=COMMAND_TIMEOUT)
+        done = subprocess.run([*argv], cwd=repo, env=repo_env(), capture_output=True, text=True,
+                              timeout=COMMAND_TIMEOUT)
     except (OSError, subprocess.SubprocessError) as exc:
         return 1, f"{type(exc).__name__}: {exc}"
     return done.returncode, (done.stdout + done.stderr).strip()[-500:]

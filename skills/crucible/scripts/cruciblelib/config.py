@@ -7,7 +7,7 @@ import subprocess
 
 from . import brief
 from .answer import missing_for_confirm
-from .common import mask_secrets, CrucibleError, Root, split_lines, write_json
+from .common import mask_secrets, CrucibleError, Root, repo_env, split_lines, write_json
 from .inventory import walk_text_files
 
 LANGUAGES = {
@@ -59,7 +59,7 @@ def default_config():
 
 def git(path, *args):
     try:
-        done = subprocess.run(["git", "-C", path, *args], capture_output=True, text=True, timeout=20)
+        done = subprocess.run(["git", "-C", path, *args], env=repo_env(), capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.SubprocessError):
         return ""
     return done.stdout.strip() if done.returncode == 0 else ""

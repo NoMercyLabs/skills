@@ -207,6 +207,7 @@ def cmd_apply(root):
     get = adapters(root, cfg)
     filed = read_json(root.p("filed.json"), {})
     board_state = {}
+    repo_labels = {}
     done = 0
     for action in actions:
         if action["key"] in filed:
@@ -219,8 +220,15 @@ def cmd_apply(root):
             recheck_visibility(root, cfg, adapter, action)
             target = action["target"]
             for label in action["labels"] if action["kind"] == "issue" else []:
+                # A label the repo has is granted, never created again: gh refuses a duplicate.
+                if target not in repo_labels:
+                    repo_labels[target] = adapter.labels(target)
+                if label in repo_labels[target]:
+                    authorize(root, "tracker_labels", f"label {label} on {target}", repos=[target], labels=[label])
+                    continue
                 run_action(root, "tracker_labels", f"label {label} on {target}",
                            lambda l=label: adapter.create_label(target, l), repos=[target], labels=[label])
+                repo_labels[target].add(label)
             group = GROUP_OF[action["kind"]]
             want = {"repos": [target]}
             if action["assignee"]:

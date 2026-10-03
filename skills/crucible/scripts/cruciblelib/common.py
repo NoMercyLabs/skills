@@ -21,6 +21,12 @@ KEY_PATTERNS = [
 # Commands that start network access; the skill runs them only in its own adapters, never from a fix plan.
 GIT_NETWORK_VERBS = {"clone", "fetch", "ls-remote", "pull", "push"}
 NETWORK_PROGRAMS = {"gh", "curl", "wget", "ssh", "scp", "nc"}
+# git's repo-local variables, as `git rev-parse --local-env-vars` prints them.
+GIT_LOCAL_ENV = frozenset((
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE", "GIT_NO_REPLACE_OBJECTS", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR"))
 BASE64_RUN = re.compile(r"[A-Za-z0-9+/_-]{40,}={0,2}")
 
 
@@ -209,3 +215,9 @@ def tokens_spent(root):
     if ledger is None:
         return root.state().get("tokens_spent", 0)
     return ledger_total(ledger)
+
+
+def repo_env():
+    """The caller's environment without git's repo-local variables (`git rev-parse --local-env-vars`): a GIT_DIR set
+    by a git hook that started this run would point every command at that other repo. The identity variables stay."""
+    return {k: v for k, v in os.environ.items() if k.upper() not in GIT_LOCAL_ENV}

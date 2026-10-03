@@ -224,6 +224,18 @@ class FixBranchTests(BlockerCase):
         self.assertEqual(code, 0, out + err)
         self.assertEqual(git(self.repo, "log", "-1", "--format=%ae", self.BRANCH), "other@example.test")
 
+    def test_fix_run_ignores_a_repo_location_from_the_callers_git_env(self):
+        other = os.path.join(self.tmp(), "other")
+        os.makedirs(other)
+        git(other, "init", "-q")
+        self.allow(landing="local_branch")
+        blocker = self.planned()
+        with mock.patch.dict(os.environ, {"GIT_DIR": os.path.join(other, ".git")}):
+            code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(git(self.repo, "show", f"{self.BRANCH}:lib.py"), "FIXED")
+        self.assertEqual(git(other, "branch", "--list"), "")
+
     def test_push_needs_own_grant(self):
         self.allow(push=False)
         blocker = self.planned()

@@ -6,6 +6,7 @@ general fields, never from free text, and a draft that still looks like a path, 
 import re
 
 from .common import CrucibleError, has_key_like
+from .gate import has_privacy_word
 from .permissions import log_action, now
 
 SAFE_KEYS = ("unit_size_factor", "model_tier", "forecast_factor", "recovery", "failure_signature")
@@ -28,7 +29,11 @@ def word(value, what):
     return value
 
 
-def draft(lesson):
+def privacy_words(root):
+    return [w.lower() for w in root.config().get("privacy_words", []) if str(w).strip()]
+
+
+def draft(lesson, words=()):
     """The issue text from the general fields of one lesson, checked before it is shown."""
     evidence, expected = lesson.get("evidence") or {}, lesson.get("expected") or {}
     lines = [f"Lesson kind: {word(lesson.get('kind'), 'kind')}",
@@ -43,6 +48,9 @@ def draft(lesson):
     text = "\n".join(lines)
     if has_key_like(text) or DETAIL.search(text):
         raise CrucibleError("refused: share back: the draft holds a path, link, address or key; it is not offered")
+    hit = next((w for w in words if has_privacy_word(text, [w])), None)
+    if hit:
+        raise CrucibleError(f"refused: share back: the draft holds the privacy word {hit}; it is not offered")
     return text
 
 
@@ -68,7 +76,7 @@ def offer(root, lesson):
     """The question and the exact text, or None: off, not general, or already answered (a no is never asked again)."""
     if not settings(root).get("enabled") or not eligible(lesson) or answered(root, lesson):
         return None
-    return {"id": lesson["id"], "question": QUESTION, "text": draft(lesson)}
+    return {"id": lesson["id"], "question": QUESTION, "text": draft(lesson, privacy_words(root))}
 
 
 def answer(root, lesson, value, words):
@@ -82,7 +90,7 @@ def answer(root, lesson, value, words):
         raise CrucibleError("refused: an answer records the user's own words (--words)")
     if answered(root, lesson):
         raise CrucibleError(f"refused: {lesson['id']} is already answered; this is final and is not asked again")
-    text = draft(lesson) if value == "yes" else None
+    text = draft(lesson, privacy_words(root)) if value == "yes" else None
     cfg = root.config()
     cfg["share_back"].setdefault("answers", {})[lesson["id"]] = {"answer": value, "words": words, "at": now()}
     root.save_config(cfg)
@@ -98,7 +106,7 @@ def final_text(root, lesson):
     row = answered(root, lesson)
     if not row or row["answer"] != "yes":
         raise CrucibleError("refused: share back: no yes from the user for this lesson")
-    return draft(lesson)
+    return draft(lesson, privacy_words(root))
 
 
 def report_lines(root):
