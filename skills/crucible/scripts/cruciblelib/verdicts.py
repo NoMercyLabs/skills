@@ -7,6 +7,8 @@ from . import brief, rootcause
 from .common import CrucibleError, Root, read_json, source_id, write_json
 from .gate import check_finding
 from .inventory import mark_coverage
+from .permissions import log_action
+from .visibility import forced_private_reasons
 
 # A reject must leave no defect: a reason that calls the defect real, latent or "a different bug" is a fix.
 REAL_DEFECT = re.compile(r"\b(?:is|are|remains?) (?:still )?real\b|\blatent\b|\breal (?:defect|bug|issue|consequence)\b"
@@ -21,6 +23,20 @@ ADDABLE = {"before_you_fix", "labels", "not_checked", "siblings", "verified_link
 def cand_source(unit, cand):
     # a fix may change the title; the verifier judged the candidate under its first id
     return cand.get("_source") or source_id(unit, cand)
+
+
+def load_candidates(root, unit):
+    """The unit's candidates with every copied `_source` removed: the engine, not the verifier, names a candidate.
+
+    The first candidate keeps its `_source`. A later one that repeats the id of an earlier candidate is an
+    appended copy: it loses the `_source` and takes the id of its own title."""
+    cands = root.candidates(unit)
+    taken = set()
+    for c in cands:
+        if c.get("_source") in taken:
+            del c["_source"]
+        taken.add(cand_source(unit, c))
+    return cands
 
 
 def load_verdicts(root, unit):
@@ -80,14 +96,25 @@ def checked_problems(root, repo, entries):
     return bad
 
 
+def shape_problems(root, src, cand):
+    """Every problem the gate would find in a candidate that accept will file: one list, before accept runs."""
+    final = {k: v for k, v in cand.items() if not k.startswith("_")}
+    final["id"] = "CAND"
+    force_private(final, src, [])
+    return check_finding(root, final, root.config())
+
+
 def check_verdicts(root, unit, only=None):
     """-> (problems, judged, total) for the unit's candidates and dropped leads."""
     repo = root.unit(unit)["repo"]
-    cands = root.candidates(unit)
+    cands = load_candidates(root, unit)
     by_src = {cand_source(unit, c): c for c in cands}
     verdicts = load_verdicts(root, unit)
     sources = list(only or by_src)
     bad = []
+    if len(by_src) < len(cands):
+        bad.append(f"{unit}: two candidates share the title {next(c['title'] for c in cands if sum(1 for d in cands if cand_source(unit, d) == cand_source(unit, c)) > 1)!r}; "
+                   f"the title makes the id, so give the appended candidate its own title")
     for s in sources:
         v = verdicts.get(s)
         if s not in by_src:
@@ -116,6 +143,8 @@ def check_verdicts(root, unit, only=None):
             except CrucibleError as exc:
                 bad.append(f"{s}: {exc}")
                 continue
+        if v["verdict"] != "reject":
+            bad += [f"{s}: {b}" for b in shape_problems(root, s, trial if v["verdict"] == "fix" else by_src[s])]
         found = checked_problems(root, repo, v["checked"] if isinstance(v["checked"], list) else [v["checked"]])
         bad += [f"{s}: {b}" for b in found]
         if v["verdict"] != "reject":
@@ -156,9 +185,9 @@ def next_finding_id(root, state):
 
 def apply_fixes(root, unit):
     """Store every verifier fix in the candidate file; running it again changes nothing."""
-    cands = root.candidates(unit)
+    cands = load_candidates(root, unit)
     verdicts = load_verdicts(root, unit)
-    changed = False
+    changed = cands != root.candidates(unit)
     for c in cands:
         src = cand_source(unit, c)
         v = verdicts.get(src, {})
@@ -213,6 +242,15 @@ def cmd_accept(args):
         raise
 
 
+def force_private(finding, src, forced):
+    """A finding whose text matches a forced-private reason is private, whatever the verifier left; safer than a refusal."""
+    reasons = forced_private_reasons(finding)
+    if reasons and finding.get("visibility") != "private":
+        was = finding.get("visibility") or "unset"
+        finding["visibility"] = "private"
+        forced.append((src, was, reasons[0]))
+
+
 def accept_unit(args):
     root = Root(args.root)
     root.require_confirmed()
@@ -235,6 +273,7 @@ def accept_unit(args):
     cands = apply_fixes(root, unit)
     verdicts = load_verdicts(root, unit)
     promoted, routed, failed, route_failed = [], [], 0, 0
+    forced = []
     cfg = root.config()
     before = snapshot_writes(root, state)
     for c in cands:
@@ -244,7 +283,9 @@ def accept_unit(args):
         kind = c.get("intent_kind")
         if kind in brief.ROUTED_KINDS and not (kind == "accepted_risk" and args.file_accepted_risks):
             # The brief says not to file it: the gate still judges it, then it goes to the report.
-            problems = check_finding(root, {k: v for k, v in c.items() if not k.startswith("_")}, cfg)
+            routed_copy = {k: v for k, v in c.items() if not k.startswith("_")}
+            force_private(routed_copy, src, forced)
+            problems = check_finding(root, routed_copy, cfg)
             if problems:
                 failed += 1
                 route_failed += 1
@@ -252,6 +293,8 @@ def accept_unit(args):
                 for p in problems:
                     print(f"  {p}")
             else:
+                if routed_copy.get("visibility") != c.get("visibility"):
+                    c["visibility"] = routed_copy["visibility"]
                 brief.route_candidate(root, unit, src, c)
                 routed.append(src)
             continue
@@ -259,6 +302,7 @@ def accept_unit(args):
         finding = {k: v for k, v in c.items() if not k.startswith("_")}
         finding["id"] = fid
         finding["source"] = src
+        force_private(finding, src, forced)
         write_json(root.p("findings", fid + ".json"), finding)
         state["accepted"][src] = fid
         root.save_state(state)
@@ -275,6 +319,8 @@ def accept_unit(args):
         print(f"ACCEPT REFUSED {unit}: the gate failed {failed} of {len(promoted) + route_failed} findings; "
               f"fix the candidates and run accept again")
         return 1
+    for source, was, reason in forced:
+        log_action(root, "accept", f"set visibility private {source}", f"was {was}: {reason}", "ok")
     rejected = sum(1 for c in cands if verdicts[cand_source(unit, c)]["verdict"] == "reject")
     routed_note = f", {len(routed)} not filed because of the brief (see `crucible report`)" if routed else ""
     entry["status"] = "done"

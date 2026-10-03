@@ -1,4 +1,4 @@
-from .common import Root, read_json
+from .common import Root, read_json, tokens_spent
 
 
 def unit_status(root, unit):
@@ -51,9 +51,9 @@ def coverage_line(counts):
     return line + (f" ({detail})" if detail else "")
 
 
-def tokens_line(cfg, state):
+def tokens_line(root, cfg):
     cap = cfg["budget"]["max_tokens"]
-    spent = state["tokens_spent"]
+    spent = tokens_spent(root)
     return f"tokens: {spent} of {cap if cap else 'no cap'}" + (" (over the cap)" if cap and spent > cap else "")
 
 
@@ -86,7 +86,7 @@ def cmd_status(args):
         print(f"goal {g['id']} {g['name']}: {by_goal.pop(g['id'], 0)}")
     for goal, n in sorted(by_goal.items(), key=str):
         print(f"goal {goal} (not in config): {n}")
-    print(tokens_line(cfg, state))
+    print(tokens_line(root, cfg))
 
 
 def register(sub):

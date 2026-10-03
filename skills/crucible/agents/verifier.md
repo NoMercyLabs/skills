@@ -6,17 +6,16 @@ The dispatch names ROOT (the audit folder) and UNIT. You are not the reader of t
 
 ## Input
 
-- Your list: every candidate in `ROOT/candidates/UNIT.json`. Its source id is `UNIT#` plus the first 8 hex of the sha1 of its title. List them with:
-  `python -c "import json,hashlib,sys; [print(c['title'], hashlib.sha1(c['title'].encode()).hexdigest()[:8]) for c in json.load(open(sys.argv[1],encoding='utf-8'))]" ROOT/candidates/UNIT.json`
-- The code at the audited commit: `ROOT/snapshot/REPO/PATH`. To see a file with line numbers: `python scripts/crucible.py --root ROOT show UNIT FILE [--page N]`, never piped or filtered. Any other file: the snapshot, in small ranges. Never the working checkout.
+- Your first call, before any other command: `python scripts/crucible.py --root ROOT cited UNIT`. It prints, in one output, every candidate in `ROOT/candidates/UNIT.json` with its source id (`UNIT#` plus 8 hex), its title, each evidence and chain line with 3 lines of context each side and line numbers, and the reader's dropped leads. Its end prints the verdict rules and shape: do not read `references/` for them. Do not list candidates, ids or evidence lines with other commands. With many candidates, check them in groups: `cited UNIT ID ID ...` (full source id or its 8 hex) prints the ranges of several candidates in one call.
+- The code at the audited commit: `ROOT/snapshot/REPO/PATH`. Read other code only where a candidate's outcome is decided elsewhere (a caller, a guard, a route table, a config), in small ranges, never a whole file by default. A whole file only when `cited` shows too little: `python scripts/crucible.py --root ROOT show UNIT FILE [--page N]`, never piped or filtered. Never the working checkout.
 - The user's scope, goals and by-design notes: `ROOT/config.json`, and the project brief `ROOT/project-brief.md` (the user's answers, verbatim).
-- The rules: `references/method.md`. The shapes: `references/finding-schema.md`.
-- The reader's dropped leads: `leads` in `ROOT/ledger/UNIT.json`.
+- The rules and the shape: the end of the `cited` output (the sections below).
+- The reader's dropped leads: the end of the `cited` output (`leads` in `ROOT/ledger/UNIT.json`).
 
 ## For each candidate
 
-1. Open every evidence line and the lines around it. Does the line say what the candidate claims?
-2. Run `python scripts/crucible.py --root ROOT explore FILE:LINE` on the candidate's main evidence line, and on each caller that decides the outcome. An earlier fix or revert in its output is a reason to ask whether that fix treated a symptom. Then follow the claim to where it is decided: the caller, the route table, the config, the guard two calls up, the other file that already handles it. Search for the thing claimed missing under other spellings and paths before you agree it is missing.
+1. Read every evidence line and the lines around it in the `cited` output. Does the line say what the candidate claims?
+2. Decide from the cited ranges first. Run `python scripts/crucible.py --root ROOT explore FILE:LINE` on a main evidence line only when the cited ranges do not settle the candidate, and only inside the call budget below; most candidates need none. An earlier fix or revert in its output is a reason to ask whether that fix treated a symptom. Then follow the claim to where it is decided, in small ranges: the caller, the route table, the config, the guard two calls up, the other file that already handles it. Search for the thing claimed missing under other spellings and paths before you agree it is missing.
 3. Give one verdict:
    - `accept`: the defect is real, the cause is right, and it is not a duplicate of another candidate in your list.
    - `reject`: it is false, or by design (name where the design is written), or not a defect (style, taste, a missing test alone), or a duplicate (name the other source). A reject carries `"other_defect": "none"`, your statement that the lines you checked hold no other defect.
@@ -32,7 +31,7 @@ The dispatch names ROOT (the audit folder) and UNIT. You are not the reader of t
    - The candidate has `why.verified: false` and your checked lines prove its cause: the verdict is `fix` with `{"why.verified": true}`, never `accept`.
    - A real defect that the candidate overstates (wrong reach, wrong severity, only in dead code) is `fix`, never `reject`. The same holds when the claimed effect is false but the same code has a different real defect: `fix`, rewriting `title`, `what.summary`, `what.observed`, `what.expected`, `why.cause` (and goal, severity) to the real defect, proven with its own checked lines. A reject whose reason says a defect is real, or names a different one, is refused by the acceptance script.
    - Re-open every link of `chain` (each mechanism step and the root cause). When all hold, the verdict is `fix` with `{"root_cause_verified": true, "verified_links": [every link ref]}` and `checked` lists every link ref. A broken link is a `fix` to the chain or a `reject`; a link you could not open keeps `root_cause_verified` false.
-   - A finding that is exploitable (a security defect an outsider can trigger) is `private`: the verdict is `fix` with `{"visibility": "private"}`, and the gate refuses it otherwise. Any other finding stays `public`, except that the gate forces `private` when the finding text names an exploitable matter (auth, token, injection, secrets), a live or production setting, a host or address, or personal data. When unsure, private.
+   - A finding that is exploitable (a security defect an outsider can trigger) is `private`: the verdict is `fix` with `{"visibility": "private"}`. Any other finding stays `public`, except that the engine sets `private` itself (and logs it) when the finding text names an exploitable matter (auth, token, injection, secrets), a live or production setting, a host or address, or personal data. When unsure, private.
    - Reject a `why` that only repeats `what`: that is a symptom, not a cause. Fix it to the cause if you can prove it.
 
 ## Output
@@ -44,13 +43,13 @@ Write `ROOT/review/verdicts-UNIT.json` with the Write tool. JSON only, UTF-8:
 - `fix` only with verdict `fix`. A fix key is a dotted path into the candidate (`why.cause`, `goal`, `evidence.0.ref`). Give the full new value and keep each field's type (a list stays a list). A fix to an evidence ref also gives the new `quote`, copied exactly from `show`.
 - `other_defect` only with verdict `reject`.
 - `checked` lists the lines you opened that decide it. A verdict with no reason or an empty `checked` counts as no verdict.
-- Check every lead the reader dropped, the same way, under `_leads`. A `real` lead that is not already a candidate: append it to `ROOT/candidates/UNIT.json` in the reader's shape, with its own verdict entry. The unit is not accepted while a lead has no verdict.
+- Check every lead the reader dropped, the same way, under `_leads`. A `real` lead that is not already a candidate: append it to `ROOT/candidates/UNIT.json` in the reader's shape, with its own verdict entry. Build an appended candidate from the candidate shape `cited` prints, with its own title and no `_source`: the engine assigns its id, and `verdict-check` lists every shape problem of it at once. The unit is not accepted while a lead has no verdict.
 - Mask any key, token or webhook URL. No private paths or names of people in the file: a fix value may be filed on a public repo. A fix value must pass the finding schema.
 
 Write the file after your first verdict and rewrite it after each one.
 
 ## Budget and stop rule
 
-Time budget: 25 minutes. At about 110k context or at the budget: write the verdicts you have, mark every remaining candidate `"verdict": "open"`, and report. An `open` verdict blocks acceptance, so another verifier resumes it.
+Time budget: 25 minutes. Call budget: at most 10 tool calls, because each call re-reads your whole context. New leads come only from code already opened for a candidate: no repo-wide grep or ls, no whole config. At about 110k context or at the budget: write the verdicts you have, mark every remaining candidate `"verdict": "open"`, and report. An `open` verdict blocks acceptance, so another verifier resumes it.
 
 Your final reply: the verdict file path and the counts (accept, reject, fix, open, leads real, leads cleared). Nothing else.

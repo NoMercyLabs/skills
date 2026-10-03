@@ -66,6 +66,16 @@ class HowItWorksTests(CrucibleCase):
                     shown = [str(calibration["selftest"][tier]["found"])]
                 self.assertTrue(any(s in body for s in shown), f"{tier} {key} ({shown}) not stated")
 
+    def test_how_it_works_shows_the_cost_split(self):
+        calibration = json.load(open(os.path.join(SKILL, "references", "calibration.json"), encoding="utf-8"))
+        body = section(self.text(), "Models and cost")
+        for tier in ("balanced", "fast"):
+            split = calibration["selftest"][tier]["cost_split"]
+            self.assertEqual(split["total"], sum(split[k] for k in ("input", "cache_write", "cache_read", "output")))
+            self.assertEqual(split["total"], calibration["selftest"][tier]["cost_tokens"])
+            for key in ("input", "cache_write", "cache_read", "output", "total"):
+                self.assertIn(f"{split[key]:,}", body, f"{tier} {key} not stated")
+
 
 if __name__ == "__main__":
     unittest.main()

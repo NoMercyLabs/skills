@@ -1,9 +1,9 @@
 import math
 import os
 
-from .common import CrucibleError, Root, read_json, write_json
+from .common import CrucibleError, Root, ledger_total, read_json, replaced_tokens, tokens_spent, write_json
 from .models import JUDGE_CALL_TOKENS, TIERS, plan_for
-from .transcripts import read_usage
+from .transcripts import SPLIT_NAMES, read_usage
 
 PILOT_UNITS = 3
 REFIT_EVERY = 10
@@ -81,7 +81,10 @@ def fit_line(points):
         return None
     slope = max(0.0, sum((x - mx) * (y - my) for x, y in points) / sxx)
     start = max(0.0, my - slope * mx)
-    worst = max(abs(start + slope * x - y) / y for x, y in points if y > 0)
+    measured = [(x, y) for x, y in points if y > 0]
+    if not measured:
+        return None
+    worst = max(abs(start + slope * x - y) / y for x, y in measured)
     return start, slope, worst
 
 
@@ -156,9 +159,10 @@ def project(plan, tiers, records):
     return parts
 
 
-def summary(parts):
-    spent = sum(p["spent"] for p in parts.values())
-    total = sum(p["total"] for p in parts.values())
+def summary(parts, wasted=0):
+    """`wasted`: tokens of replaced records, spent already and in no part."""
+    spent = sum(p["spent"] for p in parts.values()) + wasted
+    total = sum(p["total"] for p in parts.values()) + wasted
     margin = math.ceil(sum(p["margin"] for p in parts.values()))
     return {"spent": spent, "total": total, "low": max(spent, total - margin), "high": total + margin}
 
@@ -200,6 +204,19 @@ def ensure_first_estimate(root, plan, tiers, ledger):
         write_json(ledger_path(root), ledger)
 
 
+def cost_split(records):
+    """Sum of each usage field over the records, with the total, or None when a record has no split (an older ledger)."""
+    if not records or any("split" not in r for r in records):
+        return None
+    found = {name: sum(r["split"][name] for r in records) for name in SPLIT_NAMES.values()}
+    return dict(found, total=sum(found.values()))
+
+
+def split_text(found):
+    return (f"cost split: input {found['input']}, cache write {found['cache_write']}, cache read {found['cache_read']}, "
+            f"output {found['output']}, total {found['total']}")
+
+
 def is_complete(plan, records):
     read = {r["unit"] for r in records if r["role"] == "reader"}
     return bool(plan["units"]) and all(u["unit"] in read for u in plan["units"])
@@ -219,7 +236,7 @@ def readers_may_start(root):
     ledger = load_ledger(root)
     plan = plan_for(root)
     tiers = terms_by_tier(load_calibration(calibration_path(root, ledger)))
-    return not over_cap(root, summary(project(plan, tiers, ledger["records"]))["high"])
+    return not over_cap(root, summary(project(plan, tiers, ledger["records"]), replaced_tokens(ledger))["high"])
 
 
 def forecast_text(found):
@@ -254,12 +271,12 @@ def cmd_calibrate(args):
         next(iter(plan["complex_jobs"].values()))["tier"])
     record = {"role": args.role, "unit": unit and unit["unit"], "tier": tier, "lines": unit["lines"] if unit else 0,
               "candidates": args.candidates, "calls": args.calls, "turns": usage["turns"],
-              "tokens": usage["tokens"], "output": usage["output"], "transcript": os.path.basename(args.transcript)}
+              "tokens": usage["tokens"], "output": usage["output"], "split": usage["split"],
+              "transcript": os.path.basename(args.transcript)}
     old = [r for r in ledger["records"] if r["role"] == args.role and (r["unit"] == record["unit"] or unit is None)]
     ledger["records"] = [r for r in ledger["records"] if r not in old] + [record]
-    state = root.state()
-    state["tokens_spent"] += record["tokens"] - sum(r["tokens"] for r in old)
-    root.save_state(state)
+    ledger["replaced"] = ledger.get("replaced", []) + [dict(r, replaced=True) for r in old]
+    write_json(ledger_path(root), ledger)
     pilot = min(PILOT_UNITS, len(units))
     counted = sum(1 for r in ledger["records"] if r["role"] == args.role) if args.role in ("reader", "verifier") else         sum(1 for r in ledger["records"] if r["role"] == "reader")
     if args.refit or (args.role in ("reader", "verifier") and refit_due(counted, pilot)):
@@ -281,9 +298,12 @@ def cmd_calibrate(args):
     if calibration:
         write_json(path, calibration)
     write_json(ledger_path(root), ledger)
-    found = summary(project(plan, tiers, ledger["records"]))
+    found = summary(project(plan, tiers, ledger["records"]), replaced_tokens(ledger))
     print(f"recorded {args.role} {record['unit'] or ''}: {record['tokens']} tokens from the harness transcript, "
           f"{record['turns']} turns".replace("  ", " "))
+    split = cost_split(ledger["records"])
+    if split:
+        print(split_text(split))
     print(forecast_text(found))
     if over_cap(root, found["high"]):
         print(stop_line(root, found["high"]))
@@ -341,7 +361,7 @@ def cmd_tokens(args):
     print(f"units: {len(plan['units'])}")
     print("pilot: " + ", ".join(u["unit"] for u in pick_pilot(plan["units"])))
     print_estimate(plan, tiers)
-    found = summary(project(plan, tiers, ledger["records"]))
+    found = summary(project(plan, tiers, ledger["records"]), replaced_tokens(ledger))
     if ledger["records"]:
         print(f"spent: {found['spent']}")
         print(forecast_text(found))

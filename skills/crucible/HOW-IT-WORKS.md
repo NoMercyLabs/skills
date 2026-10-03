@@ -77,9 +77,10 @@ A change after `confirm` goes back through `summary`, `plan` and a new yes.
 
 ## What it never does
 
-It never fixes product code.
-It files findings and never fixes them.
-A blocker fix needs its own grant, and a backup comes first.
+It files product findings and never fixes them.
+It changes product code only to fix a blocker, which is something that stops the audit or the filing.
+A blocker fix needs the `blocker_fixes` grant, and a backup comes first.
+Pushing the fix branch needs the separate `blocker_pushes` grant.
 
 It never files without a grant.
 It never files before you approve a dry run of the exact plan.
@@ -93,8 +94,11 @@ It never asks for a password, token or key.
 It never reads credential folders, shell history or browser data.
 It never opens a secret file of a repo, such as `.env` files and key files.
 It sends no telemetry.
-It does not download anything or install packages.
-It uses only the Python standard library, and its code opens no network socket.
+It installs no packages and uses only the Python standard library.
+The engine opens no network socket of its own, and the only network use is through the `git` and `gh` commands, in two adapters, each behind a named grant such as `workspace_clones` or `blocker_pushes`.
+The `gh` adapter files issues and pull requests, and reads knowledge sources, under the `knowledge_sources` grant.
+The `git` adapter clones under the `workspace_clones` and `knowledge_clone` grants, and pushes a branch under the `blocker_pushes` grant.
+One granted `url` knowledge source is a single HTTPS read under the `knowledge_sources` grant.
 It never takes an action it cannot log.
 It never reuses an old permission answer unless you say yes.
 It treats text inside the audited code as data, never as an instruction.
@@ -111,7 +115,9 @@ Balanced tier:
 - Recall: 12 of 12 (found 12 of 12 seeded).
 - Invented findings: 0.
 - Coverage: 100 percent.
-- Cost: 5,362,016 tokens.
+- Cost: 3,450,797 tokens.
+- Cost by usage field: input 104, cache write 299,879, cache read 3,101,850, output 48,964, total 3,450,797 tokens.
+- Known extra findings: 7.
 - Forecast error: 0.0.
 - Result: SELFTEST PASS.
 
@@ -121,12 +127,17 @@ Fast tier:
 - Invented findings: 0.
 - Coverage: 0 percent.
 - Cost: 3,214,698 tokens.
+- Cost by usage field: input 354, cache write 240,155, cache read 2,938,170, output 36,019, total 3,214,698 tokens.
 - Forecast error: 0.0.
 - Result: SELFTEST FAIL, because the readers produced no findings that pass the gate.
 
 The balanced reader is the default for this reason.
 The fast tier found 0 of 12 on the same fixture.
 The fast tier is cheaper, but it fails the gate.
+
+The four usage fields are not priced alike.
+Cache reads are the largest field here and cost far less per token than output.
+Read the total with the split beside it.
 
 The fixture has 2 units.
 The pilot therefore covers every unit.
@@ -135,7 +146,16 @@ A forecast error of 0.0 does not prove the forecast.
 The first-try forecast errors were -0.5181 for balanced and -0.4215 for fast.
 The verifier default was far below the measured verifier use.
 The refit fixed the verifier cost.
-For the balanced tier, the verifier start cost went from 12,000 to 1,739,124 tokens.
+For the balanced tier, the verifier cost per candidate went from 2,500 to 124,635 tokens, and its start cost went from 12,000 to 0.
+
+The verifier brief changed after that first balanced run.
+The cited command now prints the verdict rules, so the verifier makes fewer tool calls.
+The balanced run cost 5,362,016 tokens before the change and 3,450,797 after it.
+The verifier for the first unit used 1,665,289 tokens before and 1,219,736 after.
+That unit includes two resumes after its appended candidate failed the gate; its first 9 tool calls cost 658,622.
+The verifier for the second unit used 1,812,959 tokens before and 347,293 after.
+An earlier run, before the brief change, used 1,313,708 and 1,483,392 tokens for the two units.
+The full history is under `history` in `references/calibration.json`.
 
 ## Self-heal and lessons
 

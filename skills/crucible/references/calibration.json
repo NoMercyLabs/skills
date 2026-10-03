@@ -6,8 +6,8 @@
    "turn_tokens": 4000,
    "lines_per_turn": 400,
    "output_tokens": 15644,
-   "verifier_start_tokens": 1739124,
-   "verifier_tokens_per_candidate": 0,
+   "verifier_start_tokens": 0,
+   "verifier_tokens_per_candidate": 124635,
    "candidates_per_unit": 3,
    "judge_call_tokens": 4000,
    "main_session_tokens": 50000,
@@ -55,6 +55,18 @@
    "forecast": 5362016,
    "actual": 5362016,
    "forecast_error": 0.0
+  },
+  {
+   "source": "crucible-selftest-run4",
+   "stage": "pilot",
+   "after_units": 2,
+   "roles": [
+    "reader",
+    "verifier"
+   ],
+   "forecast": 3450797,
+   "actual": 3450797,
+   "forecast_error": 0.0
   }
  ],
  "selftest": {
@@ -62,12 +74,20 @@
    "recall": "12 of 12",
    "found": 12,
    "seeded": 12,
-   "known_extras_found": 6,
+   "known_extras_found": 7,
    "invented": 0,
    "coverage_percent": 100,
-   "cost_tokens": 5362016,
+   "cost_tokens": 3450797,
+   "cost_split": {
+    "input": 104,
+    "cache_write": 299879,
+    "cache_read": 3101850,
+    "output": 48964,
+    "total": 3450797
+   },
    "forecast_error": 0.0,
-   "selftest": "SELFTEST PASS"
+   "selftest": "SELFTEST PASS",
+   "source": "crucible-selftest-run4"
   },
   "fast": {
    "recall": "0 of 12",
@@ -77,6 +97,13 @@
    "invented": 0,
    "coverage_percent": 0,
    "cost_tokens": 3214698,
+   "cost_split": {
+    "input": 354,
+    "cache_write": 240155,
+    "cache_read": 2938170,
+    "output": 36019,
+    "total": 3214698
+   },
    "forecast_error": 0.0,
    "selftest": "SELFTEST FAIL: found 0 of 12, at least 10 needed; coverage 0%"
   }
@@ -121,5 +148,84 @@
  "notes": [
   "The fixture has 2 units, so the pilot covers every unit and forecast_error 0.0 does not prove the forecast.",
   "The fast tier is measured on the same fixture: its readers did not produce findings that pass the gate, so its recall is as listed; the balanced tier is the default reader."
- ]
+ ],
+ "history": {
+  "balanced_run2": {
+   "recall": "12 of 12",
+   "found": 12,
+   "seeded": 12,
+   "known_extras_found": 6,
+   "invented": 0,
+   "coverage_percent": 100,
+   "cost_tokens": 5362016,
+   "cost_split": {
+    "input": 148,
+    "cache_write": 341954,
+    "cache_read": 4950263,
+    "output": 69651,
+    "total": 5362016
+   },
+   "forecast_error": 0.0,
+   "selftest": "SELFTEST PASS",
+   "source": "crucible-selftest-run2",
+   "note": "Balanced run before the cited-verdict verifier brief; kept so nothing is lost."
+  },
+  "verifier_tokens_per_unit": {
+   "run2_before_cited_verdict": {
+    "repo-u01a": {
+     "candidates": 13,
+     "tokens": 1665289,
+     "turns": 20
+    },
+    "repo-u01b": {
+     "candidates": 7,
+     "tokens": 1812959,
+     "turns": 24
+    }
+   },
+   "run3_before_cited_verdict_change": {
+    "repo-u01a": {
+     "tokens": 1313708,
+     "note": "before its resume"
+    },
+    "repo-u01b": {
+     "tokens": 1483392
+    }
+   },
+   "run4_cited_verdict": {
+    "repo-u01a": {
+     "candidates": 14,
+     "tokens": 1219736,
+     "turns": 17,
+     "split": {
+      "input": 38,
+      "cache_write": 81823,
+      "cache_read": 1125335,
+      "output": 12540
+     }
+    },
+    "repo-u01b": {
+     "candidates": 7,
+     "tokens": 347293,
+     "turns": 6,
+     "split": {
+      "input": 12,
+      "cache_write": 56503,
+      "cache_read": 285642,
+      "output": 5136
+     }
+    }
+   },
+   "run4_repo-u01a_before_resume": {
+    "input": 20,
+    "cache_write": 76625,
+    "cache_read": 571879,
+    "output": 10098,
+    "total": 658622,
+    "tool_calls": 9,
+    "note": "first 9 tool calls; the appended candidate then failed the gate and the agent was resumed twice; the run4 record above holds the whole transcript"
+   }
+  },
+  "note": "Run4 differs from run3 only in the verifier brief: the cited command prints the verdict rules, so the verifier makes fewer tool calls."
+ }
 }

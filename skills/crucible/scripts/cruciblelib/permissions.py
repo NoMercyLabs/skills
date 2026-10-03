@@ -300,7 +300,7 @@ def cmd_report(args):
     print(coverage_line(counts))
     for line in repo_coverage_lines(root):
         print(line)
-    print(tokens_line(cfg, state))
+    print(tokens_line(root, cfg))
     from .filing import counts
     by_visibility, by_destination = counts(root)
     if by_visibility:

@@ -145,6 +145,18 @@
    "line_start": 94,
    "line_end": 95,
    "title": "Search responses can arrive out of order and overwrite the newest results"
+  },
+  {
+   "file": "app/routes.py",
+   "line_start": 63,
+   "line_end": 67,
+   "title": "Registration checks for an existing email then inserts, so a concurrent duplicate hits the unique constraint with no handler and gets a 500 instead of a 409"
+  },
+  {
+   "file": ".github/workflows/ci.yml",
+   "line_start": 11,
+   "line_end": 11,
+   "title": "The workflow grants pull-requests write permission although no step uses the pull request API"
   }
  ]
 }
