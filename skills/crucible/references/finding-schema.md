@@ -25,7 +25,7 @@
 | `siblings` | list | paths, or `searched: <query>, 0 more` |
 | `not_checked` | list | every claim not opened or run; `[]` when none |
 | `labels` | list | strings the tracker adapter maps |
-| `visibility` | string | `public` or `private`; an exploitable finding is `private` and the gate refuses it otherwise |
+| `visibility` | string | `public` or `private`; an exploitable finding is `private`; the engine sets it when forced reasons match |
 | `intent` | string | `no conflict with the brief` (checked against `project-brief.md`), or `FIELD: the user's words` copied from the brief (FIELD is one of purpose, good, intentional, must_never_change, accepted_risks, out_of_scope, known_issues) |
 | `intent_kind` | string | only with a brief line: `conflicts_intent`, `accepted_risk`, `out_of_scope` or `related`. The first three are not filed: a conflict becomes a question in the report, an accepted risk is marked accepted by the user, an out-of-scope finding is listed. `crucible accept UNIT --file-accepted-risks` files accepted risks when the user asks |
 | `chain` | object | `symptom` (`text`, `ref`), `mechanism` (list of steps) and `root_cause`. Each step and the root cause hold `ref` (path:line), `claim` and `evidence` (`{kind: file_line or explore, ref, quote, repo?}`). The root cause is at a different file:line than the symptom |
