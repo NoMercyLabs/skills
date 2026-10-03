@@ -1,7 +1,13 @@
 {
   "name": "nomercylabs",
-  "owner": { "name": "NoMercy Labs", "url": "https://github.com/NoMercyLabs" },
-  "metadata": { "description": "Agent Skills published by NoMercy Labs." },
+  "description": "Agent Skills and agent tools published by NoMercy Labs.",
+  "owner": {
+    "name": "NoMercy Labs",
+    "url": "https://github.com/NoMercyLabs"
+  },
+  "metadata": {
+    "description": "Agent Skills published by NoMercy Labs."
+  },
   "plugins": [
     {
       "name": "nomercylabs",
@@ -9,12 +15,41 @@
       "source": "./",
       "description": "Every NoMercy Labs skill in one plugin: atlas documents a whole project as one system, devbox-anywhere builds a containerized dev environment from what the repo actually uses.",
       "version": "1.3.0",
-      "author": { "name": "NoMercy Labs", "url": "https://github.com/NoMercyLabs" },
+      "author": {
+        "name": "NoMercy Labs",
+        "url": "https://github.com/NoMercyLabs"
+      },
       "homepage": "https://github.com/NoMercyLabs/skills",
       "repository": "https://github.com/NoMercyLabs/skills",
       "license": "MIT",
-      "keywords": ["documentation", "docs-as-code", "devcontainer", "docker", "code-server", "agent-skills"],
+      "keywords": [
+        "documentation",
+        "docs-as-code",
+        "devcontainer",
+        "docker",
+        "code-server",
+        "agent-skills"
+      ],
       "category": "productivity"
+    },
+    {
+      "name": "grimoira",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/NoMercyLabs/grimoira.git"
+      },
+      "description": "Per-project knowledge store for Claude Code: hooks keep it current, tools answer from it with sources.",
+      "version": "2.0.1"
+    },
+    {
+      "name": "grimora",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/NoMercyLabs/grimoira.git",
+        "path": "legacy/grimora"
+      },
+      "description": "Retired name. Installing it only prints how to move to Grimoira.",
+      "version": "2.0.0"
     }
   ]
 }
