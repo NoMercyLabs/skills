@@ -27,6 +27,12 @@ def git(repo, *args):
 
 class BlockerCase(CrucibleCase):
     def setUp(self):
+        # The caller's git identity variables would override the repo config the tests assert on.
+        env = mock.patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        for key in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"):
+            os.environ.pop(key, None)
         self.root, self.repo = self.make_root(FILES)
         self.remote = os.path.join(self.tmp(), "remote.git")
         git(self.repo, "init", "-q")
@@ -209,6 +215,14 @@ class FixBranchTests(BlockerCase):
         self.assertEqual(self.remote_branches(), [])
         self.assertEqual(self.read(self.root, "blockers.json")[0]["status"], "fixed")
         self.assertTrue(any(r["command"] == f"commit {blocker}" and r["status"] == "ok" for r in self.log()))
+
+    def test_fix_run_honours_the_callers_git_author_env(self):
+        self.allow(landing="local_branch")
+        blocker = self.planned()
+        with mock.patch.dict(os.environ, {"GIT_AUTHOR_EMAIL": "other@example.test"}):
+            code, out, err = run(self.root, "fix", "run", blocker)
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(git(self.repo, "log", "-1", "--format=%ae", self.BRANCH), "other@example.test")
 
     def test_push_needs_own_grant(self):
         self.allow(push=False)

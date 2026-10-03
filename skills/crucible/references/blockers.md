@@ -60,7 +60,7 @@ The user chose this in the interview (`blocker_fixes.landing`):
 | `local_branch` | commits on the branch `crucible/fix-BLOCKER_ID`; nothing is pushed |
 | `push_branch` | commits on, and pushes (grant `blocker_pushes`), the branch the user named in `blocker_fixes.branch` |
 
-The first fix records the checkout's branch as the base. Every `crucible/fix-BLOCKER_ID` branches from that base, so each pull request holds only its own fix. After each commit the fix branch is merged, locally only, into `crucible/audit-fixes`, which stays checked out so the next stage runs on every proven fix; it is never pushed. The commit uses the user's own git config for the author. The push is its own grant, `blocker_pushes`. If the commit, the push or the pull request fails, the blocker's status is `fixed-local` with the reason in `actions.log`, never `fixed`; the report lists it.
+The first fix records the checkout's branch as the base. Every `crucible/fix-BLOCKER_ID` branches from that base, so each pull request holds only its own fix. After each commit the fix branch is merged, locally only, into `crucible/audit-fixes`, which stays checked out so the next stage runs on every proven fix; it is never pushed. The commit uses the user's own git identity for the author: the `GIT_AUTHOR_*` variables when set, else the git config. The push is its own grant, `blocker_pushes`. If the commit, the push or the pull request fails, the blocker's status is `fixed-local` with the reason in `actions.log`, never `fixed`; the report lists it.
 
 ## Live changes
 
