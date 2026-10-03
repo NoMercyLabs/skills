@@ -315,6 +315,21 @@ class FixBranchTests(BlockerCase):
         self.assertEqual(git(self.repo, "rev-parse", "--abbrev-ref", "HEAD"), self.base)
         self.assertEqual(git(self.repo, "branch", "--list", self.BRANCH), "")
 
+    def test_leave_failed_fix_dirty_checkout_reported(self):
+        self.allow(landing="local_branch")
+        first = self.planned()
+        self.assertEqual(run(self.root, "fix", "run", first)[0], 0)
+        dirty = f'{PY} -c "open(\'lib.py\', \'w\').write(\'DIRTY-LIB\'); open(\'app.py\', \'w\').write(\'X\')"'
+        second = self.planned(root_cause="app.py:1", touch="app.py", test="test_start=app.py:1", change=dirty,
+                              proof=f'{PY} -c "import sys; sys.exit(1)"')
+        code, out, err = run(self.root, "fix", "run", second)
+        self.assertEqual(code, 1, out + err)
+        self.assertEqual(self.read(self.root, "blockers.json")[1]["status"], "failed")
+        self.assertEqual(self.lib_text(), "DIRTY-LIB")
+        entry = [r for r in self.log() if r["command"] == f"fix run {second}"][-1]
+        self.assertEqual(entry["status"], "failed")
+        self.assertIn("the checkout was not cleaned", json.dumps(entry))
+
     def test_failed_proof_removes_created_file(self):
         self.allow(landing="local_branch")
         create = PY + """ -c "open('new.py', 'x').write('NEW')" """.rstrip()
