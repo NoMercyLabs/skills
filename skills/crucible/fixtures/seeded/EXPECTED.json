@@ -1,0 +1,150 @@
+{
+ "defects": [
+  {
+   "id": "D01",
+   "file": "app/db.py",
+   "line_start": 209,
+   "line_end": 210,
+   "goal": "security",
+   "summary": "search_tasks builds SQL by string formatting from the request parameter q."
+  },
+  {
+   "id": "D02",
+   "file": "app/routes.py",
+   "line_start": 87,
+   "line_end": 89,
+   "goal": "security",
+   "summary": "user_tasks returns any user's tasks to any signed-in caller because it never compares user_id with the caller."
+  },
+  {
+   "id": "D03",
+   "file": "app/routes.py",
+   "line_start": 233,
+   "line_end": 233,
+   "goal": "security",
+   "summary": "download_attachment joins the request parameter name onto the upload folder with no containment check (path traversal)."
+  },
+  {
+   "id": "D04",
+   "file": ".github/workflows/ci.yml",
+   "line_start": 56,
+   "line_end": 57,
+   "goal": "security",
+   "summary": "The pull request title is interpolated into a run step that has secrets in the job env, and a third-party action is pinned to a moving branch."
+  },
+  {
+   "id": "D05",
+   "file": "deploy/deploy.sh",
+   "line_start": 71,
+   "line_end": 71,
+   "goal": "stability",
+   "summary": "rm -rf on an unquoted SCRATCH_DIR that expands to /* when the variable is unset or empty."
+  },
+  {
+   "id": "D06",
+   "file": "app/worker.py",
+   "line_start": 45,
+   "line_end": 47,
+   "goal": "stability",
+   "summary": "A failed job is released back to the queue on every error with no attempt cap or backoff, so it retries forever."
+  },
+  {
+   "id": "D07",
+   "file": "app/db.py",
+   "line_start": 164,
+   "line_end": 172,
+   "goal": "stability",
+   "summary": "Task number is read as MAX+1 and inserted without a transaction or unique constraint, so concurrent creates can get the same number."
+  },
+  {
+   "id": "D08",
+   "file": "app/routes.py",
+   "line_start": 146,
+   "line_end": 150,
+   "goal": "stability",
+   "summary": "Label insert errors are swallowed and the handler still returns 201, leaving a task without its labels."
+  },
+  {
+   "id": "D09",
+   "file": "app/db.py",
+   "line_start": 201,
+   "line_end": 201,
+   "goal": "features",
+   "summary": "Keyset page query uses id >= cursor, so the last item of one page is repeated as the first item of the next."
+  },
+  {
+   "id": "D10",
+   "file": "app/auth.py",
+   "line_start": 53,
+   "line_end": 53,
+   "goal": "features",
+   "summary": "Token expiry adds minutes to a seconds timestamp, so tokens last 60 seconds instead of 60 minutes."
+  },
+  {
+   "id": "D11",
+   "file": "web/tasks.js",
+   "line_start": 47,
+   "line_end": 47,
+   "goal": "security",
+   "summary": "Task titles are written through innerHTML without escaping (stored script injection)."
+  },
+  {
+   "id": "D12",
+   "file": ".env.example",
+   "line_start": 12,
+   "line_end": 12,
+   "goal": "security",
+   "summary": "The example env file the deploy script copies to .env ships a known default administrator password."
+  }
+ ],
+ "known_extras": [
+  {
+   "file": "app/auth.py",
+   "line_start": 46,
+   "line_end": 46,
+   "title": "A bearer token with a non-ASCII character gets a 500 instead of a 401"
+  },
+  {
+   "file": "app/server.py",
+   "line_start": 34,
+   "line_end": 37,
+   "title": "A negative Content-Length skips the JSON body size limit and reads the body without bound"
+  },
+  {
+   "file": "app/server.py",
+   "line_start": 47,
+   "line_end": 50,
+   "title": "A negative Content-Length skips the upload size limit and reads the body without bound"
+  },
+  {
+   "file": "app/validation.py",
+   "line_start": 92,
+   "line_end": 92,
+   "title": "Webhook URL is checked only for a scheme prefix, so internal addresses are accepted"
+  },
+  {
+   "file": "app/webhooks.py",
+   "line_start": 50,
+   "line_end": 50,
+   "title": "Webhook delivery posts to any host with no check of the target address"
+  },
+  {
+   "file": "app/routes.py",
+   "line_start": 142,
+   "line_end": 143,
+   "title": "A non-scalar assignee_id in task creation gets a 500 instead of a 422"
+  },
+  {
+   "file": "app/server.py",
+   "line_start": 122,
+   "line_end": 128,
+   "title": "Browser preflight requests get 501 because the server has no OPTIONS handler"
+  },
+  {
+   "file": "web/tasks.js",
+   "line_start": 94,
+   "line_end": 95,
+   "title": "Search responses can arrive out of order and overwrite the newest results"
+  }
+ ]
+}

@@ -1,0 +1,402 @@
+[
+ {
+  "id": "CAND",
+  "repo": "repo",
+  "title": "Scripted reader finding 1 in app/db.py",
+  "area": "app",
+  "goal": 2,
+  "severity": "medium",
+  "size": "S",
+  "stage": "none",
+  "who": {
+   "affected": "operators",
+   "owner": "platform team"
+  },
+  "what": {
+   "summary": "search_tasks builds SQL by string formatting from the request parameter q.",
+   "observed": "the line behaves as the summary describes",
+   "expected": "the line handles the case safely"
+  },
+  "where": [
+   {
+    "kind": "file",
+    "ref": "app/db.py:209"
+   }
+  ],
+  "when": {
+   "trigger": "the input or state described in the summary",
+   "frequency": "sometimes"
+  },
+  "why": {
+   "cause": "the cited line has no guard for the case",
+   "verified": true
+  },
+  "how": {
+   "reproduce": [
+    "call the code path with the input from the summary"
+   ],
+   "fix": "add the missing check at the cited line",
+   "prove": "a test that fails before the check"
+  },
+  "evidence": [
+   {
+    "kind": "file_line",
+    "ref": "app/db.py:209",
+    "quote": "\"SELECT * FROM tasks WHERE project_id = %d AND title LIKE '%%%s%%'\""
+   }
+  ],
+  "siblings": [
+   "searched the same file for the same construct, none other found"
+  ],
+  "not_checked": [
+   "root_cause: the verifier has not re-opened the chain yet"
+  ],
+  "labels": [],
+  "visibility": "public",
+  "intent": "no conflict with the brief",
+  "chain": {
+   "symptom": {
+    "text": "the caller gets a wrong or unsafe result",
+    "ref": "app/db.py:1"
+   },
+   "mechanism": [
+    {
+     "ref": "app/db.py:209",
+     "claim": "execution reaches this statement with the unchecked input",
+     "evidence": {
+      "kind": "file_line",
+      "ref": "app/db.py:209",
+      "quote": "\"SELECT * FROM tasks WHERE project_id = %d AND title LIKE '%%%s%%'\""
+     }
+    }
+   ],
+   "root_cause": {
+    "ref": "app/db.py:209",
+    "claim": "nothing at this statement checks the value before it is used",
+    "evidence": {
+     "kind": "file_line",
+     "ref": "app/db.py:209",
+     "quote": "\"SELECT * FROM tasks WHERE project_id = %d AND title LIKE '%%%s%%'\""
+    }
+   }
+  },
+  "exploration": {
+   "runs": [
+    "app/db.py:209"
+   ],
+   "followed": [
+    "app/db.py:209: the only statement involved"
+   ],
+   "not_followed": [
+    {
+     "item": "callers outside the unit",
+     "reason": "not in the audited files"
+    }
+   ]
+  },
+  "root_cause_verified": false,
+  "do_not_fix_by": [
+   "hiding the failure instead of checking the input"
+  ]
+ },
+ {
+  "id": "CAND",
+  "repo": "repo",
+  "title": "Scripted reader finding 2 in app/routes.py",
+  "area": "app",
+  "goal": 2,
+  "severity": "medium",
+  "size": "S",
+  "stage": "none",
+  "who": {
+   "affected": "operators",
+   "owner": "platform team"
+  },
+  "what": {
+   "summary": "user_tasks returns any user's tasks to any signed-in caller because it never compares user_id with the caller.",
+   "observed": "the line behaves as the summary describes",
+   "expected": "the line handles the case safely"
+  },
+  "where": [
+   {
+    "kind": "file",
+    "ref": "app/routes.py:87"
+   }
+  ],
+  "when": {
+   "trigger": "the input or state described in the summary",
+   "frequency": "sometimes"
+  },
+  "why": {
+   "cause": "the cited line has no guard for the case",
+   "verified": true
+  },
+  "how": {
+   "reproduce": [
+    "call the code path with the input from the summary"
+   ],
+   "fix": "add the missing check at the cited line",
+   "prove": "a test that fails before the check"
+  },
+  "evidence": [
+   {
+    "kind": "file_line",
+    "ref": "app/routes.py:87",
+    "quote": "def user_tasks(req, user_id):"
+   }
+  ],
+  "siblings": [
+   "searched the same file for the same construct, none other found"
+  ],
+  "not_checked": [
+   "root_cause: the verifier has not re-opened the chain yet"
+  ],
+  "labels": [],
+  "visibility": "public",
+  "intent": "no conflict with the brief",
+  "chain": {
+   "symptom": {
+    "text": "the caller gets a wrong or unsafe result",
+    "ref": "app/routes.py:1"
+   },
+   "mechanism": [
+    {
+     "ref": "app/routes.py:87",
+     "claim": "execution reaches this statement with the unchecked input",
+     "evidence": {
+      "kind": "file_line",
+      "ref": "app/routes.py:87",
+      "quote": "def user_tasks(req, user_id):"
+     }
+    }
+   ],
+   "root_cause": {
+    "ref": "app/routes.py:87",
+    "claim": "nothing at this statement checks the value before it is used",
+    "evidence": {
+     "kind": "file_line",
+     "ref": "app/routes.py:87",
+     "quote": "def user_tasks(req, user_id):"
+    }
+   }
+  },
+  "exploration": {
+   "runs": [
+    "app/routes.py:87"
+   ],
+   "followed": [
+    "app/routes.py:87: the only statement involved"
+   ],
+   "not_followed": [
+    {
+     "item": "callers outside the unit",
+     "reason": "not in the audited files"
+    }
+   ]
+  },
+  "root_cause_verified": false,
+  "do_not_fix_by": [
+   "hiding the failure instead of checking the input"
+  ]
+ },
+ {
+  "id": "CAND",
+  "repo": "repo",
+  "title": "Scripted reader finding 3 in deploy/deploy.sh",
+  "area": "deploy",
+  "goal": 3,
+  "severity": "medium",
+  "size": "S",
+  "stage": "none",
+  "who": {
+   "affected": "operators",
+   "owner": "platform team"
+  },
+  "what": {
+   "summary": "rm -rf on an unquoted SCRATCH_DIR that expands to /* when the variable is unset or empty.",
+   "observed": "the line behaves as the summary describes",
+   "expected": "the line handles the case safely"
+  },
+  "where": [
+   {
+    "kind": "file",
+    "ref": "deploy/deploy.sh:71"
+   }
+  ],
+  "when": {
+   "trigger": "the input or state described in the summary",
+   "frequency": "sometimes"
+  },
+  "why": {
+   "cause": "the cited line has no guard for the case",
+   "verified": true
+  },
+  "how": {
+   "reproduce": [
+    "call the code path with the input from the summary"
+   ],
+   "fix": "add the missing check at the cited line",
+   "prove": "a test that fails before the check"
+  },
+  "evidence": [
+   {
+    "kind": "file_line",
+    "ref": "deploy/deploy.sh:71",
+    "quote": "rm -rf $SCRATCH_DIR/*"
+   }
+  ],
+  "siblings": [
+   "searched the same file for the same construct, none other found"
+  ],
+  "not_checked": [
+   "root_cause: the verifier has not re-opened the chain yet"
+  ],
+  "labels": [],
+  "visibility": "public",
+  "intent": "no conflict with the brief",
+  "chain": {
+   "symptom": {
+    "text": "the caller gets a wrong or unsafe result",
+    "ref": "deploy/deploy.sh:1"
+   },
+   "mechanism": [
+    {
+     "ref": "deploy/deploy.sh:71",
+     "claim": "execution reaches this statement with the unchecked input",
+     "evidence": {
+      "kind": "file_line",
+      "ref": "deploy/deploy.sh:71",
+      "quote": "rm -rf $SCRATCH_DIR/*"
+     }
+    }
+   ],
+   "root_cause": {
+    "ref": "deploy/deploy.sh:71",
+    "claim": "nothing at this statement checks the value before it is used",
+    "evidence": {
+     "kind": "file_line",
+     "ref": "deploy/deploy.sh:71",
+     "quote": "rm -rf $SCRATCH_DIR/*"
+    }
+   }
+  },
+  "exploration": {
+   "runs": [
+    "deploy/deploy.sh:71"
+   ],
+   "followed": [
+    "deploy/deploy.sh:71: the only statement involved"
+   ],
+   "not_followed": [
+    {
+     "item": "callers outside the unit",
+     "reason": "not in the audited files"
+    }
+   ]
+  },
+  "root_cause_verified": false,
+  "do_not_fix_by": [
+   "hiding the failure instead of checking the input"
+  ]
+ },
+ {
+  "id": "CAND",
+  "repo": "repo",
+  "title": "Scripted reader finding on a line that is fine",
+  "area": "config",
+  "goal": 2,
+  "severity": "medium",
+  "size": "S",
+  "stage": "none",
+  "who": {
+   "affected": "operators",
+   "owner": "platform team"
+  },
+  "what": {
+   "summary": "A claim about a harmless line.",
+   "observed": "the line behaves as the summary describes",
+   "expected": "the line handles the case safely"
+  },
+  "where": [
+   {
+    "kind": "file",
+    "ref": "app/config.py:1"
+   }
+  ],
+  "when": {
+   "trigger": "the input or state described in the summary",
+   "frequency": "sometimes"
+  },
+  "why": {
+   "cause": "the cited line has no guard for the case",
+   "verified": true
+  },
+  "how": {
+   "reproduce": [
+    "call the code path with the input from the summary"
+   ],
+   "fix": "add the missing check at the cited line",
+   "prove": "a test that fails before the check"
+  },
+  "evidence": [
+   {
+    "kind": "file_line",
+    "ref": "app/config.py:1",
+    "quote": "\"\"\"Runtime settings for the task service."
+   }
+  ],
+  "siblings": [
+   "searched the same file for the same construct, none other found"
+  ],
+  "not_checked": [
+   "root_cause: the verifier has not re-opened the chain yet"
+  ],
+  "labels": [],
+  "visibility": "public",
+  "intent": "no conflict with the brief",
+  "chain": {
+   "symptom": {
+    "text": "the caller gets a wrong or unsafe result",
+    "ref": "app/config.py:2"
+   },
+   "mechanism": [
+    {
+     "ref": "app/config.py:1",
+     "claim": "execution reaches this statement with the unchecked input",
+     "evidence": {
+      "kind": "file_line",
+      "ref": "app/config.py:1",
+      "quote": "\"\"\"Runtime settings for the task service."
+     }
+    }
+   ],
+   "root_cause": {
+    "ref": "app/config.py:1",
+    "claim": "nothing at this statement checks the value before it is used",
+    "evidence": {
+     "kind": "file_line",
+     "ref": "app/config.py:1",
+     "quote": "\"\"\"Runtime settings for the task service."
+    }
+   }
+  },
+  "exploration": {
+   "runs": [
+    "app/config.py:1"
+   ],
+   "followed": [
+    "app/config.py:1: the only statement involved"
+   ],
+   "not_followed": [
+    {
+     "item": "callers outside the unit",
+     "reason": "not in the audited files"
+    }
+   ]
+  },
+  "root_cause_verified": false,
+  "do_not_fix_by": [
+   "hiding the failure instead of checking the input"
+  ]
+ }
+]

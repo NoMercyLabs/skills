@@ -1,0 +1,61 @@
+"""The only module that runs `git clone`, `git ls-remote` and `git push` (an adapter, listed in SECURITY.md).
+
+A clone starts only inside `permissions.run_action` with the `workspace_clones` grant, so no grant
+means no folder and no process. `ls_remote_branch` is a read-only query of a remote's default branch; it contacts the remote only with the same grant,
+and answers "unknown" without it.
+"""
+import os
+import re
+import subprocess
+
+from .common import CrucibleError
+from .permissions import authorize, run_action
+
+
+def ls_remote_branch(root, source):
+    """Default branch of a remote source, or "unknown" (also when the workspace_clones grant is missing: no grant, no network)."""
+    try:
+        authorize(root, "workspace_clones", f"ls-remote {source}")
+    except CrucibleError:
+        return "unknown (not looked up: no workspace_clones permission)"
+    try:
+        done = subprocess.run(["git", "ls-remote", "--symref", source, "HEAD"], capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    match = re.search(r"ref: refs/heads/(\S+)\s+HEAD", done.stdout)
+    return match.group(1) if match else "unknown"
+
+
+def clone_repos(root, rows, base, finish, group="workspace_clones", **want):
+    """Clone every row (name, source, dest) behind a grant (workspace_clones, or the one the caller names);
+    finish(row) runs after each clone. `want` is the bound the grant must cover (default: the repo names)."""
+    def action():
+        done = []
+        for row in rows:
+            if os.path.exists(row["dest"]):
+                raise CrucibleError(f"refused: {row['dest']} exists")
+        os.makedirs(os.path.dirname(rows[0]["dest"]), exist_ok=True)
+        for row in rows:
+            out = subprocess.run(["git", "clone", "--quiet", "--no-hardlinks", "--", row["source"], row["dest"]],
+                                 capture_output=True, text=True, timeout=1800)
+            if out.returncode != 0:
+                raise CrucibleError(f"git clone of {row['source']} failed: {out.stderr.strip()}")
+            finish(row)
+            done.append(row["name"])
+        return ", ".join(done)
+
+    # the grant is checked before any folder exists
+    want = want or {"repos": [r["name"] for r in rows]}
+    return run_action(root, group, f"clone {len(rows)} repos into {base}", action, **want)
+
+
+def push_branch(root, repo, branch):
+    """Push one local branch to the repo's origin, only inside the blocker_pushes grant."""
+    def action():
+        out = subprocess.run(["git", "-C", repo, "push", "--quiet", "origin", branch], capture_output=True, text=True,
+                             timeout=300)
+        if out.returncode != 0:
+            raise CrucibleError(f"git push of {branch} failed: {out.stderr.strip()[-300:]}")
+        return f"pushed {branch}"
+
+    return run_action(root, "blocker_pushes", f"push {branch}", action)

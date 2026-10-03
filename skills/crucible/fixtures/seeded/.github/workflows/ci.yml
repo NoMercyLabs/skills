@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile sources
+        run: python -m compileall -q app
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Syntax check modules
+        run: |
+          for file in web/*.js; do
+            node --check "$file"
+          done
+
+  deploy-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint the deploy script
+        run: bash -n deploy/deploy.sh
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [python, frontend, deploy-script]
+    if: github.event_name == 'pull_request'
+    env:
+      CHAT_WEBHOOK_URL: ${{ secrets.CHAT_WEBHOOK_URL }}
+      REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Announce pull request
+        run: |
+          echo "PR #${{ github.event.pull_request.number }} passed checks"
+          curl -s -X POST -d "text=${{ github.event.pull_request.title }} passed checks" "$CHAT_WEBHOOK_URL"
+      - uses: tj-actions/changed-files@main
+        id: changed
+      - name: Summarize changes
+        run: echo "changed files ${{ steps.changed.outputs.all_changed_files_count }}"

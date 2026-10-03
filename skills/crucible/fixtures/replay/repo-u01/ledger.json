@@ -1,0 +1,27 @@
+{
+ "unit": "repo-u01",
+ "read": [
+  ".env.example",
+  ".github/workflows/ci.yml",
+  "app/__init__.py",
+  "app/auth.py",
+  "app/config.py",
+  "app/db.py",
+  "app/pagination.py",
+  "app/routes.py",
+  "app/server.py",
+  "app/validation.py",
+  "app/webhooks.py",
+  "app/worker.py",
+  "config/app.json",
+  "deploy/deploy.sh",
+  "web/api.js",
+  "web/dom.js",
+  "web/form.js",
+  "web/index.html",
+  "web/main.js",
+  "web/tasks.js"
+ ],
+ "skipped": {},
+ "leads": []
+}

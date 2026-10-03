@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="1888" viewBox="0 0 1120 1888" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Made-up GitHub issue as crucible files it">
+<title>Made-up GitHub issue as crucible files it</title>
+<rect x="0" y="0" width="1120" height="1888" rx="0" fill="#0d1117"/>
+<text x="28" y="40" font-size="24" fill="#e6edf3" font-weight="600">Partial refunds ignore the order discount<tspan fill="#7d8590" font-weight="400"> #57</tspan></text>
+<rect x="28" y="52" width="62" height="24" rx="12" fill="#3fb950"/>
+<text x="59" y="69" font-size="13" fill="#ffffff" font-weight="600" text-anchor="middle">Open</text>
+<text x="104" y="69" font-size="13" fill="#7d8590">acme-api</text>
+<rect x="28" y="88" width="780" height="1568" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="52" y="118" font-size="17" fill="#e6edf3" font-weight="600">Summary</text>
+<line x1="52" y1="128" x2="784" y2="128" stroke="#30363d"/>
+<text x="52" y="148" font-size="13" fill="#e6edf3">A partial refund recomputes the amount without the order's discount.</text>
+<text x="52" y="200" font-size="17" fill="#e6edf3" font-weight="600">Observed</text>
+<line x1="52" y1="210" x2="784" y2="210" stroke="#30363d"/>
+<text x="52" y="230" font-size="13" fill="#e6edf3">Refunding 1 of 3 items on an order with a 10 percent discount returns the full item price.</text>
+<text x="52" y="282" font-size="17" fill="#e6edf3" font-weight="600">Expected</text>
+<line x1="52" y1="292" x2="784" y2="292" stroke="#30363d"/>
+<text x="52" y="312" font-size="13" fill="#e6edf3">The refund equals the item price minus that item's share of the discount.</text>
+<text x="52" y="364" font-size="17" fill="#e6edf3" font-weight="600">Where</text>
+<line x1="52" y1="374" x2="784" y2="374" stroke="#30363d"/>
+<text x="52" y="394" font-size="13" fill="#e6edf3">- file: src/billing/refund.py</text>
+<text x="52" y="414" font-size="13" fill="#e6edf3">- file: src/billing/totals.py</text>
+<text x="52" y="466" font-size="17" fill="#e6edf3" font-weight="600">When</text>
+<line x1="52" y1="476" x2="784" y2="476" stroke="#30363d"/>
+<text x="52" y="496" font-size="13" fill="#e6edf3">any partial refund on a discounted order (always)</text>
+<text x="52" y="548" font-size="17" fill="#e6edf3" font-weight="600">Cause</text>
+<line x1="52" y1="558" x2="784" y2="558" stroke="#30363d"/>
+<text x="52" y="578" font-size="13" fill="#e6edf3">The refund path reads unit_price from the line item and never calls the discount allocator.</text>
+<text x="52" y="598" font-size="13" fill="#e6edf3">(verified)</text>
+<text x="52" y="650" font-size="17" fill="#e6edf3" font-weight="600">Root cause</text>
+<line x1="52" y1="660" x2="784" y2="660" stroke="#30363d"/>
+<text x="52" y="680" font-size="13" fill="#e6edf3">Symptom: the refund amount is too high (<tspan font-family="ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace" fill="#79c0ff">src/billing/refund.py:88</tspan>)</text>
+<text x="70" y="700" font-size="13" fill="#e6edf3">1. <tspan font-family="ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace" fill="#79c0ff">src/billing/refund.py:74</tspan>: refund_amount() sums unit_price for the chosen lines.</text>
+<text x="70" y="720" font-size="13" fill="#e6edf3">2. <tspan font-family="ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace" fill="#79c0ff">src/billing/totals.py:31</tspan>: allocate_discount() is called only from order_total().</text>
+<text x="52" y="740" font-size="13" fill="#e6edf3">Root cause: <tspan font-family="ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace" fill="#79c0ff">src/billing/totals.py:19</tspan>: discount shares are computed at checkout and never stored on</text>
+<text x="52" y="760" font-size="13" fill="#e6edf3">the line item.</text>
+<text x="52" y="780" font-size="13" fill="#e6edf3">(re-opened by the verifier)</text>
+<text x="52" y="832" font-size="17" fill="#e6edf3" font-weight="600">Do not fix by</text>
+<line x1="52" y1="842" x2="784" y2="842" stroke="#30363d"/>
+<text x="52" y="862" font-size="13" fill="#e6edf3">- capping the refund at the order total, which hides the wrong amount</text>
+<text x="52" y="882" font-size="13" fill="#e6edf3">- rounding the refund down</text>
+<text x="52" y="902" font-size="13" fill="#e6edf3">- catching the over-refund error in the payment call</text>
+<text x="52" y="954" font-size="17" fill="#e6edf3" font-weight="600">Reproduce</text>
+<line x1="52" y1="964" x2="784" y2="964" stroke="#30363d"/>
+<text x="52" y="984" font-size="13" fill="#e6edf3">1. Create an order of 3 items with a 10 percent discount code.</text>
+<text x="52" y="1004" font-size="13" fill="#e6edf3">2. Refund one item through POST /refunds.</text>
+<text x="52" y="1024" font-size="13" fill="#e6edf3">3. Compare the refund amount with the item price.</text>
+<text x="52" y="1076" font-size="17" fill="#e6edf3" font-weight="600">Fix</text>
+<line x1="52" y1="1086" x2="784" y2="1086" stroke="#30363d"/>
+<text x="52" y="1106" font-size="13" fill="#e6edf3">Store the discount share on each line item at checkout and subtract it in refund_amount().</text>
+<text x="52" y="1158" font-size="17" fill="#e6edf3" font-weight="600">Prove</text>
+<line x1="52" y1="1168" x2="784" y2="1168" stroke="#30363d"/>
+<text x="52" y="1188" font-size="13" fill="#e6edf3">A test that refunds one discounted item fails on the unchanged code and passes after the fix.</text>
+<text x="52" y="1240" font-size="17" fill="#e6edf3" font-weight="600">Evidence</text>
+<line x1="52" y1="1250" x2="784" y2="1250" stroke="#30363d"/>
+<text x="52" y="1270" font-size="13" fill="#e6edf3">- <tspan font-family="ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace" fill="#79c0ff">src/billing/refund.py:74</tspan>: return sum(line.unit_price for line in lines)</text>
+<text x="52" y="1290" font-size="13" fill="#e6edf3">- <tspan font-family="ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace" fill="#79c0ff">src/billing/totals.py:19</tspan>: share = discount * line.unit_price / subtotal</text>
+<text x="52" y="1342" font-size="17" fill="#e6edf3" font-weight="600">Siblings</text>
+<line x1="52" y1="1352" x2="784" y2="1352" stroke="#30363d"/>
+<text x="52" y="1372" font-size="13" fill="#e6edf3">- src/billing/credit_note.py:52</text>
+<text x="52" y="1424" font-size="17" fill="#e6edf3" font-weight="600">Not checked</text>
+<line x1="52" y1="1434" x2="784" y2="1434" stroke="#30363d"/>
+<text x="52" y="1454" font-size="13" fill="#e6edf3">- the payment provider's partial-capture limits</text>
+<text x="52" y="1506" font-size="17" fill="#e6edf3" font-weight="600">Affected</text>
+<line x1="52" y1="1516" x2="784" y2="1516" stroke="#30363d"/>
+<text x="52" y="1536" font-size="13" fill="#e6edf3">customers who return part of a discounted order; owner: acme-api, billing</text>
+<text x="52" y="1588" font-size="17" fill="#e6edf3" font-weight="600">Severity</text>
+<line x1="52" y1="1598" x2="784" y2="1598" stroke="#30363d"/>
+<text x="52" y="1618" font-size="13" fill="#e6edf3">medium, size S</text>
+<rect x="832" y="88" width="260" height="130" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<text x="848" y="116" font-size="13" fill="#7d8590" font-weight="600">Labels</text>
+<rect x="848" y="128" width="71" height="20" rx="10" fill="#79c0ff" fill-opacity="0.15"/><rect x="848" y="128" width="71" height="20" rx="10" fill="none" stroke="#79c0ff" stroke-width="1" stroke-opacity="0.45"/><text x="857" y="142" font-size="12" fill="#79c0ff">type/bug</text>
+<rect x="925" y="128" width="98" height="20" rx="10" fill="#d2a8ff" fill-opacity="0.15"/><rect x="925" y="128" width="98" height="20" rx="10" fill="none" stroke="#d2a8ff" stroke-width="1" stroke-opacity="0.45"/><text x="934" y="142" font-size="12" fill="#d2a8ff">area/billing</text>
+<text x="848" y="174" font-size="13" fill="#7d8590" font-weight="600">Projects</text>
+<text x="848" y="196" font-size="13" fill="#e6edf3">acme-shop audit</text>
+<text x="28" y="1696" font-size="14" fill="#7d8590">An exploitable finding is not filed like this. The public repo gets only a pointer:</text>
+<rect x="28" y="1710" width="780" height="150" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+<circle cx="54" cy="1744" r="7" fill="none" stroke="#3fb950" stroke-width="1.6"/><circle cx="54" cy="1744" r="2" fill="#3fb950"/>
+<text x="74" y="1750" font-size="17" fill="#e6edf3" font-weight="600">A private report exists</text>
+<text x="52" y="1784" font-size="12" fill="#7d8590">acme-web</text>
+<text x="52" y="1814" font-size="13" fill="#e6edf3">A private report exists for this repository. Details are not public.</text>
+<text x="52" y="1840" font-size="12" fill="#7d8590">The finding itself goes to the private place the user chose.</text>
+</svg>

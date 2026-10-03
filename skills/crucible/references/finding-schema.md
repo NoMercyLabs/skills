@@ -1,0 +1,148 @@
+# Finding schema
+
+`crucible gate` enforces this. A reader writes candidates in this shape with `"id": "CAND"`. Accepted findings are `findings/F-0001.json` and up.
+
+## Fields
+
+| Field | Type | Rule |
+| --- | --- | --- |
+| `id` | string | `CAND` in a candidate, `F-NNNN` once accepted |
+| `repo` | string | repo name from the config |
+| `title` | string | 10 to 120 characters |
+| `area` | string | a folder, module or layer name |
+| `goal` | integer | an `id` from `goals` in the config |
+| `severity` | string | `critical`, `high`, `medium` or `low` |
+| `size` | string | `S`, `M` or `L`, the size of the fix |
+| `stage` | string | a stage from the config, or `none` |
+| `who` | object | `affected` (who is hit), `owner` (who fixes it) |
+| `what` | object | `summary`, `observed`, `expected` |
+| `where` | list | `{kind, ref, commit?}`; `kind` is `file`, `route`, `screen`, `workflow`, `config` or `other` |
+| `when` | object | `trigger`, `frequency` (`always`, `often`, `sometimes`, `once` or `unknown`) |
+| `why` | object | `cause`, `verified` (boolean) |
+| `how` | object | `reproduce` (list of steps), `fix`, `prove` |
+| `evidence` | list | `{kind: file_line or command, ref: "path:line", quote, repo?}`; `repo` names the repo the line is in when it is not the finding's own repo |
+| `cross_repo` | list | optional; names of the other repos of the audit that the finding spans. Each name must be a repo of the config |
+| `siblings` | list | paths, or `searched: <query>, 0 more` |
+| `not_checked` | list | every claim not opened or run; `[]` when none |
+| `labels` | list | strings the tracker adapter maps |
+| `visibility` | string | `public` or `private`; an exploitable finding is `private` and the gate refuses it otherwise |
+| `intent` | string | `no conflict with the brief` (checked against `project-brief.md`), or `FIELD: the user's words` copied from the brief (FIELD is one of purpose, good, intentional, must_never_change, accepted_risks, out_of_scope, known_issues) |
+| `intent_kind` | string | only with a brief line: `conflicts_intent`, `accepted_risk`, `out_of_scope` or `related`. The first three are not filed: a conflict becomes a question in the report, an accepted risk is marked accepted by the user, an out-of-scope finding is listed. `crucible accept UNIT --file-accepted-risks` files accepted risks when the user asks |
+| `chain` | object | `symptom` (`text`, `ref`), `mechanism` (list of steps) and `root_cause`. Each step and the root cause hold `ref` (path:line), `claim` and `evidence` (`{kind: file_line or explore, ref, quote, repo?}`). The root cause is at a different file:line than the symptom |
+| `exploration` | object | `runs` (the `explore` targets run, at least one), `followed` (callers and sources followed), `not_followed` (list of `{item, reason}`; `[]` when none) |
+| `root_cause_verified` | boolean | true only after the verifier re-opened every link; the reader writes false |
+| `verified_links` | list | only with `root_cause_verified: true`: the `ref` of every link the verifier re-opened |
+| `do_not_fix_by` | list | symptom patches that would hide the problem (a retry, a try/catch, a null check at the symptom, a bigger timeout) |
+| `prior_fix` | object | required when `explore` shows an earlier fix or revert on a cited line: `commits`, `treated_symptom` (boolean), `why_back` |
+| `before_you_fix` | object | `current_behaviour`, `callers`, `consumers`, `earlier_fixes`, `instances` |
+
+No field is empty. The text `not checked` is allowed. Placeholder text (`TBD`, `?`, `n/a`, `...`, `-`) is not.
+
+## What the gate checks
+
+A finding that spans repos lists the other repos in `cross_repo` and carries evidence (a quote at a real line) from every side. The gate refuses it when a side has no evidence, when evidence cites a repo that `cross_repo` does not list, or when a name is not a repo of the audit.
+
+- `intent` is required. The gate checks that a brief line is a line the user said (`project-brief.md`), and that `intent_kind` fits its field.
+- `why.verified: true` needs at least one `file_line` evidence whose `quote` equals the real line in the snapshot.
+- `why.verified: false` needs a `not_checked` entry starting `cause:`.
+- `chain` needs evidence on every link: a `file_line` quote at a real line of the snapshot, or an `explore` entry whose `ref` is one of `exploration.runs`.
+- `why.cause` that mostly repeats `what` (more than 60 percent of its words already in the summary, observed or expected text) is refused. So is a `chain.root_cause.ref` equal to `chain.symptom.ref`.
+- `exploration` is required with at least one run. Every `not_followed` entry has a reason. A finding with no `siblings` is refused.
+- `root_cause_verified: true` needs `verified_links` to list every link. `crucible accept` also needs the verdict's `checked` lines to cover every link. `false` needs a `not_checked` entry starting `root_cause:`.
+- When git shows a fix or revert commit on a cited line, the gate wants `prior_fix` naming that commit and saying whether it treated a symptom.
+- `do_not_fix_by` needs at least one entry. A filed issue has a "Root cause" section (the chain) and a "Do not fix by" section.
+- `crucible group` lists accepted findings that share a root-cause location (same repo, file, overlapping lines). One shared cause is one issue that lists every symptom; whether two different places are one cause is a judgment for the cross-unit step.
+- No privacy word from the config, and no key-like string, in any field. Write `<token, masked>` instead of a secret.
+- No private path and no person's name in any field: a finding may be filed on a public repo.
+
+Copy each `quote` exactly from the `show` output, one line or a few whole lines, without the line-number prefix. The gate refuses an empty quote and a quote that is not at the cited lines.
+
+## Source id
+
+A candidate's source id is `<unit>#<first 8 hex of sha1(title)>`. Verdicts are keyed by it.
+
+## Example finding
+
+```json
+{
+ "id": "CAND",
+ "repo": "orders-api",
+ "title": "Order lookup builds its SQL from the request parameter",
+ "area": "handlers",
+ "goal": 2,
+ "severity": "high",
+ "size": "S",
+ "stage": "none",
+ "who": {"affected": "every caller of the order lookup route", "owner": "orders-api, handlers"},
+ "what": {
+  "summary": "The order lookup handler concatenates the id parameter into a SQL string.",
+  "observed": "A request with id set to `1 OR 1=1` returns every order.",
+  "expected": "The id is bound as a parameter and a non-numeric id is rejected with 400."
+ },
+ "where": [{"kind": "file", "ref": "src/handlers/orders.py", "commit": "9f2c1ab"}],
+ "when": {"trigger": "any request to GET /orders/{id}", "frequency": "always"},
+ "why": {
+  "cause": "The handler formats the query with an f-string and the shared db helper has no bound-parameter variant for single-row reads.",
+  "verified": true
+ },
+ "how": {
+  "reproduce": ["Start the service with the sample database.", "Request GET /orders/1%20OR%201=1.", "Observe every row in the response."],
+  "fix": "Use a bound parameter in the handler and add a bound variant to the db helper.",
+  "prove": "A test that requests the injected id fails on the unchanged code and returns 400 after the fix."
+ },
+ "evidence": [
+  {"kind": "file_line", "ref": "src/handlers/orders.py:41", "quote": "row = db.query(f\"SELECT * FROM orders WHERE id = {order_id}\")"},
+  {"kind": "file_line", "ref": "src/db.py:18", "quote": "def query(sql):"}
+ ],
+ "siblings": ["src/handlers/invoices.py:57", "src/handlers/refunds.py:33"],
+ "not_checked": ["the production database user's privileges"],
+ "labels": ["type/bug", "area/handlers", "security"],
+ "before_you_fix": {
+  "current_behaviour": "Route returns the full row for a valid id; an injected id returns every row.",
+  "callers": "web/orders.js:12 calls the route; no other caller found by searching for the route path.",
+  "consumers": "none; the service has no mirror repo in the config.",
+  "earlier_fixes": "git log on src/handlers/orders.py shows no earlier change to this query.",
+  "instances": "production and staging (from the config); not checked whether both run this commit."
+ }
+}
+```
+
+The two siblings above are handlers with the same f-string pattern found by searching for `db.query(f"`. A finding with the same cause in three files is one finding with siblings, not three findings.
+
+## Verdict file
+
+`review/verdicts-<unit>.json`, written by the verifier:
+
+```json
+{
+ "orders-u01#3fa81c20": {
+  "verdict": "accept",
+  "reason": "The handler passes order_id from the route into an f-string; the db helper does no escaping.",
+  "checked": ["src/handlers/orders.py:41", "src/db.py:18"]
+ },
+ "orders-u01#a1b2c3d4": {
+  "verdict": "fix",
+  "reason": "Real, but the cause is proven: the helper lacks a bound variant.",
+  "checked": ["src/db.py:18"],
+  "fix": {"why.verified": true}
+ },
+ "orders-u01#0badf00d": {
+  "verdict": "reject",
+  "reason": "The route table puts an integer converter in front of this handler, so a non-numeric id never arrives.",
+  "checked": ["src/routes.py:12"],
+  "other_defect": "none"
+ },
+ "_leads": {
+  "src/handlers/refunds.py:33": {
+   "verdict": "cleared",
+   "reason": "The value is validated by the schema check two calls up.",
+   "checked": ["src/handlers/refunds.py:20", "src/validation.py:9"]
+  }
+ }
+}
+```
+
+- `verdict` is `accept`, `reject` or `fix`. A reject carries `"other_defect": "none"`.
+- `fix` is a dotted path into the candidate mapped to its full new value. A fix to an evidence ref also gives the new `quote`, copied exactly from `show`.
+- `checked` lists the lines opened that decide the verdict. A verdict with no reason or an empty `checked` counts as no verdict.
+- `_leads` has one entry per lead the reader dropped, `real` or `cleared`. A `real` lead becomes a candidate with its own verdict.
