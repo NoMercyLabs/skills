@@ -25,6 +25,20 @@ def cand_source(unit, cand):
     return cand.get("_source") or source_id(unit, cand)
 
 
+def load_candidates(root, unit):
+    """The unit's candidates with every copied `_source` removed: the engine, not the verifier, names a candidate.
+
+    The first candidate keeps its `_source`. A later one that repeats the id of an earlier candidate is an
+    appended copy: it loses the `_source` and takes the id of its own title."""
+    cands = root.candidates(unit)
+    taken = set()
+    for c in cands:
+        if c.get("_source") in taken:
+            del c["_source"]
+        taken.add(cand_source(unit, c))
+    return cands
+
+
 def load_verdicts(root, unit):
     merged = dict(root.verdicts(unit))
     for path in sorted(glob.glob(root.p("review", f"verdicts-{unit}-*.json"))):
@@ -82,14 +96,25 @@ def checked_problems(root, repo, entries):
     return bad
 
 
+def shape_problems(root, src, cand):
+    """Every problem the gate would find in a candidate that accept will file: one list, before accept runs."""
+    final = {k: v for k, v in cand.items() if not k.startswith("_")}
+    final["id"] = "CAND"
+    force_private(final, src, [])
+    return check_finding(root, final, root.config())
+
+
 def check_verdicts(root, unit, only=None):
     """-> (problems, judged, total) for the unit's candidates and dropped leads."""
     repo = root.unit(unit)["repo"]
-    cands = root.candidates(unit)
+    cands = load_candidates(root, unit)
     by_src = {cand_source(unit, c): c for c in cands}
     verdicts = load_verdicts(root, unit)
     sources = list(only or by_src)
     bad = []
+    if len(by_src) < len(cands):
+        bad.append(f"{unit}: two candidates share the title {next(c['title'] for c in cands if sum(1 for d in cands if cand_source(unit, d) == cand_source(unit, c)) > 1)!r}; "
+                   f"the title makes the id, so give the appended candidate its own title")
     for s in sources:
         v = verdicts.get(s)
         if s not in by_src:
@@ -118,6 +143,8 @@ def check_verdicts(root, unit, only=None):
             except CrucibleError as exc:
                 bad.append(f"{s}: {exc}")
                 continue
+        if v["verdict"] != "reject":
+            bad += [f"{s}: {b}" for b in shape_problems(root, s, trial if v["verdict"] == "fix" else by_src[s])]
         found = checked_problems(root, repo, v["checked"] if isinstance(v["checked"], list) else [v["checked"]])
         bad += [f"{s}: {b}" for b in found]
         if v["verdict"] != "reject":
@@ -158,9 +185,9 @@ def next_finding_id(root, state):
 
 def apply_fixes(root, unit):
     """Store every verifier fix in the candidate file; running it again changes nothing."""
-    cands = root.candidates(unit)
+    cands = load_candidates(root, unit)
     verdicts = load_verdicts(root, unit)
-    changed = False
+    changed = cands != root.candidates(unit)
     for c in cands:
         src = cand_source(unit, c)
         v = verdicts.get(src, {})

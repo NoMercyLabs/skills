@@ -214,7 +214,8 @@ class AcceptTests(CrucibleCase):
     def test_accept_rerun_idempotent(self):
         good, bad = good_finding(), good_finding(title="Second handler problem here", siblings=[])
         root, unit = self.prepared_unit([good, bad], {src(UNIT, good): verdict(), src(UNIT, bad): verdict()})
-        code, out = self.accept(root)
+        with mock.patch.object(verdicts, "shape_problems", return_value=[]):  # only the accept-time gate is left
+            code, out = self.accept(root)
         self.assertEqual(code, 1)
         self.assertIn("the gate failed 1 of 2", out)
         self.assertNotIn("decided before", out)
@@ -236,7 +237,8 @@ class AcceptTests(CrucibleCase):
         good, bad = good_finding(), good_finding(title="Second handler problem here", siblings=[])
         root, unit = self.prepared_unit([good, bad], {src(UNIT, good): verdict(), src(UNIT, bad): verdict()})
         before = read_json(os.path.join(root, "state.json"))["accepted"]
-        code, out = self.accept(root)
+        with mock.patch.object(verdicts, "shape_problems", return_value=[]):  # only the accept-time gate is left
+            code, out = self.accept(root)
         self.assertEqual(code, 1)
         self.assertIn("the gate failed 1 of 2", out)
         findings_dir = os.path.join(root, "findings")
@@ -323,6 +325,32 @@ class AcceptTests(CrucibleCase):
         entry = read_json(os.path.join(root, "coverage.json"))["files"]["svc/app.py"]
         self.assertEqual(entry["status"], "done")
         self.assertRegex(entry["sha256"], r"^[0-9a-f]{64}$")
+
+    def test_appended_candidate_gets_own_id(self):
+        a = good_finding()
+        b = good_finding(title="Second handler problem with its own title")
+        b["_source"] = src(UNIT, a)  # copied from the candidate it was built from
+        b["when"]["frequency"] = "rare"
+        del b["chain"]
+        verdicts_ = {src(UNIT, a): verdict(), src(UNIT, b): verdict()}
+        root, unit = self.prepared_unit([a, b], verdicts_)
+        code, out, err = run(root, "verdict-check", unit)
+        self.assertEqual(code, 1, out + err)
+        self.assertIn(f"{src(UNIT, b)}: when.frequency must be one of", out)
+        self.assertIn(f"{src(UNIT, b)}: chain", out)
+        code, out = self.accept(root)
+        self.assertEqual(code, 1, out)
+        self.assertFalse(os.path.isdir(os.path.join(root, "findings")))
+        fixed = good_finding(title="Second handler problem with its own title")
+        fixed["_source"] = src(UNIT, a)
+        self.write(root, f"candidates/{unit}.json", [a, fixed])
+        code, out = self.accept(root)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(sorted(os.listdir(os.path.join(root, "findings"))), ["F-0001.json", "F-0002.json"])
+        sources = {read_json(os.path.join(root, "findings", n))["source"] for n in os.listdir(os.path.join(root, "findings"))}
+        self.assertEqual(sources, {src(UNIT, a), src(UNIT, fixed)})
+        stored = read_json(os.path.join(root, "candidates", unit + ".json"))
+        self.assertNotEqual(stored[1].get("_source"), src(UNIT, a))
 
 
 if __name__ == "__main__":
