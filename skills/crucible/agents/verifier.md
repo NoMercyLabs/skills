@@ -15,7 +15,7 @@ The dispatch names ROOT (the audit folder) and UNIT. You are not the reader of t
 ## For each candidate
 
 1. Read every evidence line and the lines around it in the `cited` output. Does the line say what the candidate claims?
-2. Run `python scripts/crucible.py --root ROOT explore FILE:LINE` on the candidate's main evidence line only, not on every caller. An earlier fix or revert in its output is a reason to ask whether that fix treated a symptom. Then follow the claim to where it is decided, in small ranges: the caller, the route table, the config, the guard two calls up, the other file that already handles it. Search for the thing claimed missing under other spellings and paths before you agree it is missing.
+2. Decide from the cited ranges first. Run `python scripts/crucible.py --root ROOT explore FILE:LINE` on a main evidence line only when the cited ranges do not settle the candidate, and only inside the call budget below; most candidates need none. An earlier fix or revert in its output is a reason to ask whether that fix treated a symptom. Then follow the claim to where it is decided, in small ranges: the caller, the route table, the config, the guard two calls up, the other file that already handles it. Search for the thing claimed missing under other spellings and paths before you agree it is missing.
 3. Give one verdict:
    - `accept`: the defect is real, the cause is right, and it is not a duplicate of another candidate in your list.
    - `reject`: it is false, or by design (name where the design is written), or not a defect (style, taste, a missing test alone), or a duplicate (name the other source). A reject carries `"other_defect": "none"`, your statement that the lines you checked hold no other defect.
@@ -43,7 +43,7 @@ Write `ROOT/review/verdicts-UNIT.json` with the Write tool. JSON only, UTF-8:
 - `fix` only with verdict `fix`. A fix key is a dotted path into the candidate (`why.cause`, `goal`, `evidence.0.ref`). Give the full new value and keep each field's type (a list stays a list). A fix to an evidence ref also gives the new `quote`, copied exactly from `show`.
 - `other_defect` only with verdict `reject`.
 - `checked` lists the lines you opened that decide it. A verdict with no reason or an empty `checked` counts as no verdict.
-- Check every lead the reader dropped, the same way, under `_leads`. A `real` lead that is not already a candidate: append it to `ROOT/candidates/UNIT.json` in the reader's shape, with its own verdict entry. The unit is not accepted while a lead has no verdict.
+- Check every lead the reader dropped, the same way, under `_leads`. A `real` lead that is not already a candidate: append it to `ROOT/candidates/UNIT.json` in the reader's shape, with its own verdict entry. Build an appended candidate from the candidate shape `cited` prints, with its own title and no `_source`: the engine assigns its id, and `verdict-check` lists every shape problem of it at once. The unit is not accepted while a lead has no verdict.
 - Mask any key, token or webhook URL. No private paths or names of people in the file: a fix value may be filed on a public repo. A fix value must pass the finding schema.
 
 Write the file after your first verdict and rewrite it after each one.

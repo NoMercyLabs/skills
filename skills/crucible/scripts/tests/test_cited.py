@@ -76,6 +76,19 @@ class CitedCase(CrucibleCase):
         self.assertIn("unknown unit", err)
         self.assertNotIn("Traceback", out + err)
 
+    def test_verifier_brief_matches_call_budget(self):
+        base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        text = self.read_text(os.path.join(base, "agents", "verifier.md"))
+        self.assertIn("at most 10 tool calls", text)
+        lines = [ln for ln in text.splitlines() if "explore" in ln]
+        self.assertTrue(lines)
+        for ln in lines:
+            self.assertNotRegex(ln, r"(?i)(?:each|every|per) candidate|candidate.s main evidence line only",
+                                "explore must not be asked once per candidate")
+        self.assertRegex(text, r"(?i)explore[^.]*only when the cited ranges do not settle")
+        self.assertRegex(text, r"(?i)appended candidate[^.]*no `_source`")
+
+
     def test_verifier_brief_starts_with_cited(self):
         base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         text = self.read_text(os.path.join(base, "agents", "verifier.md"))
