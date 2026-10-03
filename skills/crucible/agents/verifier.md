@@ -6,17 +6,16 @@ The dispatch names ROOT (the audit folder) and UNIT. You are not the reader of t
 
 ## Input
 
-- Your list: every candidate in `ROOT/candidates/UNIT.json`. Its source id is `UNIT#` plus the first 8 hex of the sha1 of its title. List them with:
-  `python -c "import json,hashlib,sys; [print(c['title'], hashlib.sha1(c['title'].encode()).hexdigest()[:8]) for c in json.load(open(sys.argv[1],encoding='utf-8'))]" ROOT/candidates/UNIT.json`
-- The code at the audited commit: `ROOT/snapshot/REPO/PATH`. To see a file with line numbers: `python scripts/crucible.py --root ROOT show UNIT FILE [--page N]`, never piped or filtered. Any other file: the snapshot, in small ranges. Never the working checkout.
+- Your first call, before any other command: `python scripts/crucible.py --root ROOT cited UNIT`. It prints, in one output, every candidate in `ROOT/candidates/UNIT.json` with its source id (`UNIT#` plus 8 hex), its title, each evidence and chain line with 3 lines of context each side and line numbers, and the reader's dropped leads. Do not list candidates, ids or evidence lines with other commands.
+- The code at the audited commit: `ROOT/snapshot/REPO/PATH`. Read other code only where a candidate's outcome is decided elsewhere (a caller, a guard, a route table, a config), in small ranges, never a whole file by default. A whole file only when `cited` shows too little: `python scripts/crucible.py --root ROOT show UNIT FILE [--page N]`, never piped or filtered. Never the working checkout.
 - The user's scope, goals and by-design notes: `ROOT/config.json`, and the project brief `ROOT/project-brief.md` (the user's answers, verbatim).
 - The rules: `references/method.md`. The shapes: `references/finding-schema.md`.
-- The reader's dropped leads: `leads` in `ROOT/ledger/UNIT.json`.
+- The reader's dropped leads: the end of the `cited` output (`leads` in `ROOT/ledger/UNIT.json`).
 
 ## For each candidate
 
-1. Open every evidence line and the lines around it. Does the line say what the candidate claims?
-2. Run `python scripts/crucible.py --root ROOT explore FILE:LINE` on the candidate's main evidence line, and on each caller that decides the outcome. An earlier fix or revert in its output is a reason to ask whether that fix treated a symptom. Then follow the claim to where it is decided: the caller, the route table, the config, the guard two calls up, the other file that already handles it. Search for the thing claimed missing under other spellings and paths before you agree it is missing.
+1. Read every evidence line and the lines around it in the `cited` output. Does the line say what the candidate claims?
+2. Run `python scripts/crucible.py --root ROOT explore FILE:LINE` on the candidate's main evidence line only, not on every caller. An earlier fix or revert in its output is a reason to ask whether that fix treated a symptom. Then follow the claim to where it is decided, in small ranges: the caller, the route table, the config, the guard two calls up, the other file that already handles it. Search for the thing claimed missing under other spellings and paths before you agree it is missing.
 3. Give one verdict:
    - `accept`: the defect is real, the cause is right, and it is not a duplicate of another candidate in your list.
    - `reject`: it is false, or by design (name where the design is written), or not a defect (style, taste, a missing test alone), or a duplicate (name the other source). A reject carries `"other_defect": "none"`, your statement that the lines you checked hold no other defect.
