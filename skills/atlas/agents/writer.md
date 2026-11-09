@@ -22,6 +22,10 @@ Write one page. Do not touch any other file.
     Links to:  <pages this one defers to>
     Covers:    <the source paths this page is answerable for>
 
+`<paste the page's card from docs-work/cards/ here>`
+
+`<paste docs-work/voice.md here>`
+
 `<paste docs-work/toolchain.md here>`
 
 `<paste the reference page here>`
@@ -61,17 +65,26 @@ registered yet.
 
 ## Voice
 
-Match the reference page at the sentence level, not the page shape. Shape belongs
-to the tier: a walkthrough is ordered by what the reader does, a concept page by
-what they need to understand, a reference page by the surface it catalogs.
+Read `docs-work/voice.md` and the writing section of `references/voice.md` first.
+The passages the owner chose are the target. Learn the decisions they make, and do
+not copy their sentences.
 
-Five checks, none of which need judgment:
+Your card says who reads this page and what they already know. Do not explain what
+they already know. What this kind of product is for belongs on the introduction
+page only. Open with where the feature is and how it behaves here, and spend your
+words on what the reader could not assume.
 
-- One idea per sentence.
-- One sentence per line.
-- Three sentences to a paragraph, then a blank line.
-- Four parallel facts are a table.
-- Nothing between a step and its outcome.
+Put real requirements, and any consequence that starts the moment they act, before
+the action. Keep reasons, causes and outcomes; a page of bare clicks has failed too.
+
+Read the page aloud in your head. Where you would stop and go back, rewrite. Check
+the last third hardest: that is where a page turns into a list of edge cases. A fact
+the reader would not act on, an internal, or a known bug does not go on the page.
+Report it under Defects or Map problems.
+
+Shape belongs to the tier: a walkthrough is ordered by what the reader does, a
+concept page by what they need to understand, a reference page by the surface it
+catalogs.
 
 Two shapes are never used: a code span in a heading, and a sequence written as
 arrows in a sentence (three or more steps are a numbered list).

@@ -5,21 +5,32 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
-import subprocess
+import pathlib
 import sys
 import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import check_batch  # noqa: E402
 import check_docs  # noqa: E402
+import test_check_page as page_tests  # noqa: E402
 
 MAP = """# Map
 
 | Page | Tier | Job | Owns | Assumes | Links to | Covers | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| /guide | reference | Explains the thing. | thing | - | - | src | reviewed |
+| /guide/example | reference | Explains the thing. | thing | - | - | src | reviewed |
+"""
+
+
+SURFACES = """# Surfaces
+
+| Surface | Kind | Who | States | Page |
+| --- | --- | --- | --- | --- |
+| The settings screen | screen | anyone | empty, full | /guide/example |
 """
 
 
@@ -135,23 +146,56 @@ class CoverageTests(unittest.TestCase):
         self.assertIn("## Files opened", out)
 
 
-class StatusTests(unittest.TestCase):
+class ReviewedPage(unittest.TestCase):
+    """A real page with real review records, in a project with a map and a manifest."""
+
     def setUp(self) -> None:
-        self.work = Workdir({"docs-work/toolchain.md": "answers\n", "src/a.py": "x = 1\n", "docs/guide.md": "# Guide\n"})
+        self.page = page_tests.GateTests()
+        self.page.setUp()
+        self.addCleanup(self.page.doCleanups)
+        self.page.prepare_reviews()
+        self.manifest = os.path.join(str(self.page.root), "manifest.json")
+        entry = {
+            "page": str(self.page.page),
+            "card": str(self.page.card),
+            "reviews": str(self.page.reviews),
+            "result": os.path.join(str(self.page.root), "result.log"),
+        }
+        with open(self.manifest, "w", encoding="utf-8") as handle:
+            json.dump([entry], handle)
+        self.work = Workdir({"docs-work/toolchain.md": "answers\n", "src/a.py": "x = 1\n"})
+        self.addCleanup(self.work.close)
         self.work.write("docs-work/map.md", MAP)
-        for kind in ("factcheck", "reader"):
-            digest = check_docs.page_digest("docs/guide.md")
-            self.work.write(
-                f"docs-work/reviews/guide.{kind}.md",
-                f"Verdict: PASS\nReviewed: docs/guide.md\nReviewed-SHA: {digest}\n",
-            )
         self.rows, _ = check_docs.parse_map("docs-work/map.md")
 
-    def tearDown(self) -> None:
-        self.work.close()
+    def accept(self) -> None:
+        with contextlib.redirect_stdout(io.StringIO()):
+            check_batch.run(check_batch.load_manifest(pathlib.Path(self.manifest)), final=True)
+
+
+class StatusTests(ReviewedPage):
+    def setUp(self) -> None:
+        super().setUp()
+        self.accept()
+
+        self.work.write("docs-work/surfaces.md", SURFACES)
 
     def status(self, srcs: list[str]) -> tuple[int, str]:
-        return run(check_docs.emit_status, self.rows, "docs-work/reviews", "docs-work/slices", srcs)
+        return run(check_docs.emit_status, self.rows, self.manifest, "docs-work/slices", srcs, "docs-work/surfaces.md")
+
+    def test_status_is_incomplete_when_the_manifest_holds_a_page_the_map_does_not(self) -> None:
+        self.work.write("docs-work/slices/one.md", slice_report(["src/a.py"]))
+        self.rows.clear()
+        code, out = self.status(["src"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("STATUS: INCOMPLETE", out)
+
+    def test_status_is_incomplete_without_a_product_inventory(self) -> None:
+        self.work.write("docs-work/slices/one.md", slice_report(["src/a.py"]))
+        os.remove("docs-work/surfaces.md")
+        code, out = self.status(["src"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("Surfaces: FAIL", out)
 
     def test_status_is_incomplete_when_no_slice_was_scanned(self) -> None:
         code, out = self.status(["src"])
@@ -177,68 +221,114 @@ class StatusTests(unittest.TestCase):
         code, out = self.status(["src"])
         self.assertEqual(code, 0, out)
         self.assertIn("STATUS: DELIVERED", out)
+        self.assertIn("Pages accepted: 1 of 1", out)
         self.assertIn("Coverage: PASS", out)
 
+    def test_status_is_incomplete_when_the_page_changed_after_acceptance(self) -> None:
+        self.work.write("docs-work/slices/one.md", slice_report(["src/a.py"]))
+        self.page.card.write_text(self.page.card.read_text() + "\n", encoding="utf-8")
+        code, out = self.status(["src"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("STATUS: INCOMPLETE", out)
+        self.assertIn("Pages accepted: 0 of 1", out)
 
-class ReviewTests(unittest.TestCase):
-    """`reviews`: a verdict must judge the current page, and a new stamp needs a new review."""
 
-    def setUp(self) -> None:
-        self.work = Workdir({"docs/guide.md": "# Guide\n\nThe first version.\n"})
-        self.work.write("docs-work/map.md", MAP)
-        for kind in ("factcheck", "reader"):
-            self.verdict(kind, "Checked the first version.")
-        self.rows, _ = check_docs.parse_map("docs-work/map.md")
-
-    def tearDown(self) -> None:
-        self.work.close()
-
-    def verdict(self, kind: str, text: str) -> None:
-        digest = check_docs.page_digest("docs/guide.md")
-        self.work.write(
-            f"docs-work/reviews/guide.{kind}.md",
-            f"# Review\nVerdict: PASS\nReviewed: docs/guide.md\nReviewed-SHA: {digest}\n\n{text}\n",
-        )
-
-    def commit(self) -> None:
-        for args in (
-            ["init", "-q"],
-            ["add", "-A"],
-            ["-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "reviewed"],
-        ):
-            subprocess.run(["git", *args], cwd=self.work.root, check=True, capture_output=True)
+class ReviewTests(ReviewedPage):
+    """`reviews`: only an acceptance that still matches the page, card and render counts."""
 
     def reviews(self) -> tuple[int, str]:
-        return run(check_docs.check_reviews, self.rows, "docs-work/reviews")
+        return run(check_docs.check_reviews, self.rows, self.manifest)
 
-    def test_fresh_verdicts_pass(self) -> None:
+    def test_an_accepted_page_passes(self) -> None:
+        self.accept()
         code, out = self.reviews()
         self.assertEqual(code, 0, out)
 
-    def test_a_page_edited_after_its_review_is_stale(self) -> None:
-        self.work.write("docs/guide.md", "# Guide\n\nThe second version.\n")
+    def test_passing_reviews_without_final_acceptance_fail(self) -> None:
         code, out = self.reviews()
         self.assertEqual(code, 1, out)
-        self.assertIn("stale", out)
+        self.assertIn("/guide/example", out)
 
-    def test_a_verdict_that_only_changed_its_stamp_fails(self) -> None:
-        self.commit()
-        self.work.write("docs/guide.md", "# Guide\n\nThe second version.\n")
-        self.verdict("factcheck", "Checked the second version.")
-        self.verdict("reader", "Checked the first version.")
+    def test_a_card_change_after_acceptance_forces_new_reviews(self) -> None:
+        self.accept()
+        self.page.card.write_text(self.page.card.read_text() + "\n", encoding="utf-8")
         code, out = self.reviews()
         self.assertEqual(code, 1, out)
-        self.assertIn("reader review only changed its stamp", out)
-        self.assertNotIn("factcheck review only changed its stamp", out)
+        self.assertIn("/guide/example", out)
 
-    def test_a_new_review_of_the_changed_page_passes(self) -> None:
-        self.commit()
-        self.work.write("docs/guide.md", "# Guide\n\nThe second version.\n")
-        for kind in ("factcheck", "reader"):
-            self.verdict(kind, "Checked the second version.")
+    def test_a_map_row_outside_the_manifest_fails(self) -> None:
+        self.accept()
+        self.rows[0]["page"] = "/guide/other"
         code, out = self.reviews()
+        self.assertEqual(code, 1, out)
+        self.assertIn("/guide/other: not in the manifest", out)
+
+    def test_a_manifest_page_missing_from_the_map_fails(self) -> None:
+        self.accept()
+        self.rows.clear()
+        code, out = self.reviews()
+        self.assertEqual(code, 1, out)
+        self.assertIn("/guide/example: in the manifest but not on the map", out)
+
+    def test_a_missing_manifest_fails(self) -> None:
+        code, out = run(check_docs.check_reviews, self.rows, "docs-work/no-such-manifest.json")
+        self.assertEqual(code, 1, out)
+        self.assertIn("manifest", out)
+
+    def test_a_planned_page_fails_even_with_an_acceptance(self) -> None:
+        self.accept()
+        self.rows[0]["status"] = "planned"
+        code, out = self.reviews()
+        self.assertEqual(code, 1, out)
+        self.assertIn("still planned", out)
+
+
+
+class SurfaceTests(unittest.TestCase):
+    """`surfaces`: everything a person can reach is claimed by a page or excluded."""
+
+    def setUp(self) -> None:
+        self.work = Workdir({})
+        self.addCleanup(self.work.close)
+        self.work.write("docs-work/map.md", MAP)
+        self.rows, _ = check_docs.parse_map("docs-work/map.md")
+
+    def check(self, body: str) -> tuple[int, str]:
+        self.work.write("docs-work/surfaces.md", body)
+        return run(check_docs.check_surfaces, "docs-work/surfaces.md", self.rows)
+
+    def test_a_surface_on_a_mapped_page_passes(self) -> None:
+        code, out = self.check(SURFACES)
         self.assertEqual(code, 0, out)
 
+    def test_a_surface_on_an_unplanned_page_fails(self) -> None:
+        code, out = self.check(SURFACES.replace("/guide/example", "/guide/nowhere"))
+        self.assertEqual(code, 1, out)
+        self.assertIn("/guide/nowhere", out)
+
+    def test_an_exclusion_needs_a_reason(self) -> None:
+        code, out = self.check(SURFACES.replace("/guide/example", "excluded:"))
+        self.assertEqual(code, 1, out)
+        self.assertIn("reason", out)
+
+    def test_an_exclusion_with_a_reason_passes(self) -> None:
+        code, out = self.check(SURFACES.replace("/guide/example", "excluded: internal only"))
+        self.assertEqual(code, 0, out)
+
+    def test_a_surface_without_roles_or_states_fails(self) -> None:
+        code, out = self.check(SURFACES.replace("| anyone | empty, full |", "| - | - |"))
+        self.assertEqual(code, 1, out)
+        self.assertIn("names no", out)
+
+    def test_an_unknown_kind_fails(self) -> None:
+        code, out = self.check(SURFACES.replace("| screen |", "| widget |"))
+        self.assertEqual(code, 1, out)
+        self.assertIn("kind", out)
+
+    def test_a_missing_inventory_fails(self) -> None:
+        code, out = run(check_docs.check_surfaces, "docs-work/none.md", self.rows)
+        self.assertEqual(code, 1, out)
+        self.assertIn("surfaces", out)
 
 
 class StyleTests(unittest.TestCase):

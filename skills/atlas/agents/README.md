@@ -34,4 +34,4 @@ two expensive roles run once per page.
 
 Nothing here is allowed to buy savings with coverage. The gates are unchanged
 whichever model ran: the slice union is still diffed against a real walk, and a
-page still needs two `Verdict: PASS` files.
+page still needs its `ACCEPTED` result.

@@ -1,6 +1,6 @@
 # The voice
 
-**This skill is a documentation authoring voice.** That is the whole of it, and everything below is that voice written down.
+Everything below is how this skill treats a reader, written down.
 
 A voice is not a template, a house style, or a preference about wording. It is the set of decisions that get made hundreds of times while documenting anything: what earns a sentence and what does not, what a step owes the reader before it ends, where a fact belongs when three pages could carry it, how much of a true thing is the right amount here, what may never be written without having been read first. Those decisions are what make a documentation set feel like one person wrote it, and made by default they are what makes it feel machine-made.
 
@@ -16,11 +16,51 @@ The three commitments are stated in the skill file. What each one costs is here.
 
 **Coherence.** One vocabulary, one architecture picture, no page contradicting another, no orphan references. The set is read across pages even when it is written a page at a time, and a contradiction between two correct pages is a defect neither page can see.
 
-**Uniform shape.** Consistency is not tidiness, it is what lets a reader recognize a construct by its silhouette instead of parsing it. Once every construct, heading, table and section carries one shape, the eye can skip what it already knows and spend its attention on the content. That only works if the shape holds without exception, which is why a rule earned by a large case applies unchanged to a small one.
+**Uniform code, human prose.** The same code construct, heading form and reference entry keep one shape, because that lets a reader recognize them without parsing them. The project decides what the shape is: its formatter, its style document, its surrounding source. Prose has no such template. Forcing sentences into a fixed length or a matching pattern is exactly what makes a page sound machine-made.
 
-Any rule that fires only when something is "big enough" destroys the benefit it was meant to give, because the reader must now evaluate the condition on every instance to know whether the shape they are seeing is meaningful. A construct written one way at one member and another way at five is not a saved line, it is a signal the reader has to stop and check. This matters most for a dyslexic reader, for whom uniform shapes are the difference between scanning a page and decoding it, and it costs nothing for everyone else.
+### Write for the person reading, in words they would say
 
-**The project decides what the shape is; this rule decides only that it does not vary.** What counts as the canonical form of a literal, a declaration or a call is a question every language and every codebase has already answered, and the answer differs completely between them. Find that answer, the formatter config, the style document, the surrounding source, and then apply it at every size without exception. A formatter settles only what it has an opinion about, and it is indifferent about more than it appears to be: where it accepts both forms, this rule still decides, and it decides the same way at one member as at five. A shape borrowed from the language you last worked in is a foreign accent on every page.
+**Know what this reader already knows, and do not explain it.** Before a page is written, its card says who reads it and what they already know. A person who went looking for this kind of product already knows what that kind of product does. They are new to this one. What the category is for is said once, on the introduction page, and never in a topic page.
+
+**Knowing the category is not the same as being ready.** The reader may not have installed it, connected it or been given the right role. Real requirements come before the steps they affect.
+
+**Open with where the thing is and how it behaves here.** Spend the words on what the reader could not assume: the default that surprises people, the condition that changes the result, the thing that keeps running after they leave.
+
+**Do not let it become a dry list of clicks.** Keep the reason for a choice, the cause of a result and what happens next. Cut only what teaches the category or describes the page.
+
+**Every fact has to earn its place with this reader.** Being true and verified is not enough. Ask what the reader would do differently for knowing it. If nothing, it does not go on this page. A list of edge cases at the end of a good explanation is the most common way a page turns back into a machine's inventory.
+
+**Internals and bugs are not page content.** How the code looks something up, a limit of the current version, a feature that does not work yet: file an issue and leave it off the page. Tell the reader only what they will see and what they can do about it.
+
+**When a page keeps going after its main story, it is several pages.** Move the rest to a page that owns it, written as its own explanation, and link it. Rare exceptions go where a person with that problem will look: a troubleshooting entry named after the symptom.
+
+Nine decisions shape the writing:
+
+1. Start from what this reader does not know yet. A concept or lookup answers the question directly.
+2. Cut sentences about the page. Say the useful thing.
+3. Break manufactured matching halves and lists of three. Join related thoughts when that makes them easier to follow. Do not count sentences into a rhythm.
+4. Give the main path the most attention. Requirements and consequences come before the action they affect, including a consequence that starts the moment the reader saves. Unrelated detail moves later.
+5. Recommend one starting option when the evidence supports it, and say why it suits the goal.
+6. Explain a term when the reader first needs it.
+7. On a task, say which options to leave alone for now.
+8. On a task, end the main path at the moment the reader can see it worked. A reference page has no such ending.
+9. On a task, keep the reader on the page until that moment, unless a real prerequisite lives elsewhere.
+
+A fictional product shows the difference.
+
+Explains what the reader already knows:
+
+> Backups protect your work from being lost. A scheduled backup copies your files automatically, so you never have to remember.
+
+Tells them what they could not assume:
+
+> A new schedule runs as soon as you save it, not at the time you picked, so expect one backup straight away. It keeps running while you are signed out.
+>
+> Go to **Backups** and choose **New schedule**. Pick a folder, leave **Keep** at 30 days, and save.
+
+The project's own examples live in `docs-work/voice.md`. They outrank this section, and anything the owner chose outranks the rest of that file. Learn the decisions they make, and do not reproduce them as a template. When two passages in that file pull in different directions, the newest choice wins and the older one is marked superseded, so no writer can justify opposite approaches from one file.
+
+Agreement between agents does not prove a human voice. When two agents share the work, each tells the other directly what is wrong with its work, and they settle it. The owner is never the one who has to catch it. Read-aloud is the listening test: a sentence that makes a reader stop and go back has failed, however correct it is.
 
 ### Every sentence has an origin, and the origin is the code
 
@@ -86,7 +126,7 @@ A correction is also where the opposite mistake starts. Told that something is t
 
 The exception is real and it is where the hardest documentation lives. Where the causal chain *is* what the reader must learn, an ordering guarantee, a lock hierarchy, a failure that only appears three steps from its cause, compressing it to a consequence destroys the page, because the consequence is exactly what they cannot derive on their own and cannot apply to a case you did not list. Then the chain is written out in full, one link per step, each step observable. Tell the two apart by asking what the reader does next: reasoning they need in order to act on a case you have not shown is the content, and reasoning that merely explains how you arrived at the answer is not.
 
-**Write from the reader's vantage, not the repository's.** An introduction that opens on package boundaries is a fact about your source tree. The reader arrived with a problem. Detail that is not needed to act on the current page belongs to the page that owns it.
+**Write from the reader's vantage, not the repository's.** An introduction that opens on package boundaries is a fact about your source tree. Detail that is not needed to act on the current page belongs to the page that owns it.
 
 ### Writing that stays useful
 
