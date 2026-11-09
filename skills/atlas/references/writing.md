@@ -18,15 +18,14 @@ A construct that carries a body, an argument list, a literal collection, a set o
 
 **Write for a reader who scans, not one who reads.** This is the rule with the widest reach on the page, and it is the first one to go when a sentence gets interesting to write. A dense page is not a page with too much in it: it is a page that cannot be entered, and a reader who cannot enter it does not read it more slowly, they leave.
 
-Five things make the difference, and each one is checkable without judgment:
+These help, and none of them is a counting rule:
 
-- **One idea per sentence.** Two clauses joined by a comma are two sentences.
-- **One sentence per line**, where the format allows it.
-- **Three sentences to a paragraph**, then a blank line. A fourth is a new paragraph, not a longer one.
-- **Four parallel facts are a table**, never a paragraph.
-- **Nothing between a step and its outcome.** A caveat goes after the result, not before it.
+- **Keep paragraphs short** and give each one job. A wall of text cannot be entered.
+- **Connect related thoughts.** A sentence per tiny fact reads like a transcript, and a reader using read-aloud hears it as a list of beeps.
+- **Use prose for explanation, steps for actions, tables for comparison or lookup.** A table of settings is right on a reference page. Three tables in a row on a guide means the explanation went missing.
+- **Put a caveat where it changes what the reader does.** A warning about something that happens the moment they save goes before the save. Anything else goes after the result.
 
-Long is not the problem. A page of short paragraphs can be long and still read easily. A single paragraph of six joined sentences cannot, however true every one of them is.
+Length and density are warnings a reader judges after the blind review. They are never a reason to delete a requirement.
 
 Two shapes the eye trips on:
 
@@ -117,7 +116,7 @@ A live example is judged by what the reader sees, not by whether it mounts.
 
 A reader who lands on a topic should find it whole, not half of it in two places. Three tiers, and every page does exactly one of them:
 
-- **Introduce**: what it is, why it exists, when you reach for it, the mental model. Never enumerates an API.
+- **Introduce**: what it is, why it exists, when you reach for it, the mental model. Never enumerates an API. This is the one place that explains what this kind of product is for. A topic page never repeats it.
 
 Tier one usually wants two pages rather than one, because they do different jobs for different readers. An **introduction** is the page someone arrives on, often from a search, and its job is to let them decide whether this is for them: what the thing is, what shape it has, what it can do, why it was built this way. It is the only page where making the reader interested is a legitimate goal. A **quickstart** assumes they already decided, and gets them to something working with as little friction as possible, and while doing that, it shows how the project thinks, which is the part that makes the rest of the documentation feel predictable. One page cannot do both well: framing slows down the reader who wants to start, and starting immediately never explains why they should.
 - **Detailed examples**: how you actually do it, with code that runs.
@@ -145,7 +144,7 @@ A page that takes someone from nothing to a working result, a quickstart, a setu
 
 **Every step says what the reader should now see.** A step whose outcome is unstated cannot be checked, so a reader who has quietly failed carries the failure forward and discovers it somewhere unrelated. State the observable result in the reader's terms, what appears, what changes, what becomes possible, and where a step has a common way of going wrong, name the symptom next to it. That turns a silent failure into a diagnosis without a paragraph of troubleshooting.
 
-**The outcome sentence has one shape, and it is marked.** A reader scanning for "did that work" should find the answer without reading the step again, so the sentence naming the result is written the same way every time, second person, present tense, about what is now on their screen, and visually distinct from the prose around it. Once it has a silhouette they can skip everything else and still check themselves at every step. Where the step can fail visibly, the symptoms follow immediately and each names its cause: one sentence per way it goes wrong, in the order the reader would meet them.
+**Say plainly what they should see.** A reader asking "did that work" should find the answer without reading the step again, so name what is now on their screen, in ordinary words. Where the step can fail visibly, the symptoms follow immediately and each names its cause, in the order the reader would meet them.
 
 **Steps are numbered and headed by the action.** A heading that names what the reader does, install it, give it a container, wait for it, lets someone returning to the page find the step they are on without reading. Numbers matter for the same reason a later step can then say which earlier one it modifies, by number, instead of by description.
 
@@ -220,9 +219,7 @@ The previous rule is about repetition inside one concern. It is not license to m
 
 ### Enumerations belong in tables
 
-The density that hurts a reader is not sentence length. It is parallel facts chained into a wall: four short sentences each naming a different status code, option value or enum member. Every sentence reads fine and the paragraph is unusable.
-
-When consecutive sentences each name a different value of the same thing, that is a table: one intent sentence above it, the facts inside it, the caveat in a short sentence below.
+Parallel facts chained into a wall are hard to use: several short sentences each naming a different status code, option value or enum member. On a reference page or a lookup section, make that a table: one intent sentence above it, the facts inside it, the caveat below. On a guide, ask first whether the reader needs the whole set here. Often they need one recommended value and a link.
 
 ### Documenting a surface
 

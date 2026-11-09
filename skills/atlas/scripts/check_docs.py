@@ -4,10 +4,11 @@
 Every check here fails loudly on a condition the skill would otherwise only
 promise to honor. Nothing in it knows anything about a particular project.
 
-    check_docs.py status   --map docs-work/map.md --reviews docs-work/reviews --src src
+    check_docs.py status   --map docs-work/map.md --manifest docs-work/manifest.json --src src
     check_docs.py coverage --slices docs-work/slices --src src
     check_docs.py map     --map docs-work/map.md --src src
-    check_docs.py reviews --map docs-work/map.md --reviews docs-work/reviews
+    check_docs.py surfaces --map docs-work/map.md --surfaces docs-work/surfaces.md
+    check_docs.py reviews --map docs-work/map.md --manifest docs-work/manifest.json
     check_docs.py links   --map docs-work/map.md --docs docs
     check_docs.py style   --docs docs
     check_docs.py mermaid --map docs-work/map.md
@@ -20,12 +21,13 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import hashlib
 import io
 import os
 import re
-import subprocess
 import sys
+from pathlib import Path
+
+import check_batch
 
 TIERS = {"introduce", "quickstart", "examples", "reference", "catalog"}
 STATUSES = {"planned", "drafted", "reviewed"}
@@ -339,7 +341,69 @@ def check_slices(slices_dir: str, srcs: list[str]) -> int:
     return fail(problems, "coverage")
 
 
-def emit_status(rows: list[Row], reviews_dir: str, slices_dir: str, srcs: list[str]) -> int:
+def acceptance_states(manifest: str) -> tuple[dict[str, str | None], str | None]:
+    """Route to None when its final acceptance still holds, else the reason it does not.
+
+    Recomputed from the page, card, render and review records each time, so a
+    status label or a remembered pass can never count.
+    """
+    try:
+        entries = check_batch.load_manifest(Path(manifest))
+    except (check_batch.gate.GateError, OSError, UnicodeError) as error:
+        return {}, f"manifest {manifest}: {error}"
+
+    states: dict[str, str | None] = {}
+    for entry in entries:
+        try:
+            check_batch.accepted(entry)
+            states[entry["route"]] = None
+        except (check_batch.gate.GateError, OSError, UnicodeError) as error:
+            states[entry["route"]] = str(error)
+    return states, None
+
+
+SURFACE_KINDS = {"screen", "setting", "command", "message", "task", "error", "migration", "api"}
+SURFACE_COLUMNS = ["surface", "kind", "who", "states", "page"]
+
+
+def surface_rows(path: str) -> list[list[str]]:
+    with open(path, encoding="utf-8") as handle:
+        cells = [[cell.strip() for cell in line.strip().strip("|").split("|")] for line in handle if line.lstrip().startswith("|")]
+    if not cells or [cell.lower() for cell in cells[0]] != SURFACE_COLUMNS:
+        raise ValueError(f"{path}: the table header must be " + " | ".join(SURFACE_COLUMNS))
+    return [row for row in cells[1:] if not all(set(cell) <= set("-: ") for cell in row)]
+
+
+def check_surfaces(path: str, rows: list[Row]) -> int:
+    """Everything a person can reach is claimed by a page or excluded with a reason."""
+    try:
+        surfaces = surface_rows(path)
+    except (OSError, UnicodeError, ValueError) as error:
+        return fail([f"surfaces: {error}"], "surfaces")
+
+    pages = {row["page"] for row in rows}
+    problems = [] if surfaces else [f"{path}: lists no surfaces"]
+    for row in surfaces:
+        if len(row) != len(SURFACE_COLUMNS):
+            problems.append(f"{row[0]}: expected {len(SURFACE_COLUMNS)} columns")
+            continue
+        name, kind, who, states, page = row
+        if kind.lower() not in SURFACE_KINDS:
+            problems.append(f"{name}: unknown kind '{kind}'")
+        if who in {"", "-"}:
+            problems.append(f"{name}: names no role who can reach it")
+        if states in {"", "-"}:
+            problems.append(f"{name}: names no states")
+        if page.lower().startswith("excluded:"):
+            if not page.split(":", 1)[1].strip():
+                problems.append(f"{name}: an exclusion needs a reason")
+        elif page not in pages:
+            problems.append(f"{name}: page {page} is not on the map")
+    print(f"  surfaces: {len(surfaces)} surface(s) checked")
+    return fail(problems, "surfaces")
+
+
+def emit_status(rows: list[Row], manifest: str, slices_dir: str, srcs: list[str], surfaces: str) -> int:
     """The block that opens the report. Generated, so it cannot be phrased away.
 
     Coverage runs inside it, because a status that read only the map and the
@@ -355,29 +419,24 @@ def emit_status(rows: list[Row], reviews_dir: str, slices_dir: str, srcs: list[s
     for row in rows:
         counts[row["status"].lower() if row["status"].lower() in counts else "other"] += 1
 
-    passed = failed = missing = 0
-    for row in rows:
-        for kind in ("factcheck", "reader"):
-            path = os.path.join(reviews_dir, f"{slug(row['page'])}.{kind}.md")
-            if not os.path.exists(path):
-                missing += 1
-                continue
-            with open(path, encoding="utf-8", errors="replace") as handle:
-                body = handle.read()
-            if re.search(r"^verdict:\s*pass\s*$", body, re.IGNORECASE | re.MULTILINE):
-                passed += 1
-            else:
-                failed += 1
+    states, manifest_problem = acceptance_states(manifest)
+    accepted = sum(1 for row in rows if states.get(row["page"], "missing") is None)
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        inventory = "PASS" if check_surfaces(surfaces, rows) == 0 else "FAIL"
 
     total = len(rows)
-    done = counts["reviewed"] == total and failed == 0 and missing == 0 and coverage == "PASS"
+    same_pages = bool(states) and set(states) == {row["page"] for row in rows}
+    done = counts["reviewed"] == total and accepted == total and same_pages and coverage == "PASS" and inventory == "PASS"
 
     print("")
     print("    STATUS: " + ("DELIVERED" if done else "INCOMPLETE"))
-    print(f"    Pages reviewed: {counts['reviewed']} of {total}")
+    print(f"    Pages accepted: {accepted} of {total}")
     print(f"    Drafted, not reviewed: {counts['drafted']}    Planned, not written: {counts['planned']}")
-    print(f"    Review verdicts: {passed} PASS, {failed} FAIL, {missing} missing")
     print(f"    Coverage: {coverage}")
+    print(f"    Surfaces: {inventory}")
+    if manifest_problem:
+        print(f"    Manifest: {manifest_problem}")
     print("")
 
     if coverage == "not run":
@@ -393,57 +452,7 @@ def emit_status(rows: list[Row], reviews_dir: str, slices_dir: str, srcs: list[s
     return 0 if done else 1
 
 
-def slug(page: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", page.lower()).strip("-")
-
-
-def page_digest(path: str) -> str | None:
-    try:
-        with open(path, "rb") as handle:
-            return hashlib.sha256(handle.read()).hexdigest()[:16]
-    except OSError:
-        return None
-
-
-STAMP_LINE = re.compile(r"^(verdict|reviewed|reviewed-sha):.*$", re.IGNORECASE | re.MULTILINE)
-
-
-def restamped(path: str, body: str, digest: str) -> bool:
-    """True when the last version of this verdict that judged another page digest
-    says the same thing apart from its stamp lines.
-
-    A stamp proves which version a verdict names, not that anyone read it. A
-    reviewer handed a stale verdict can copy it and paste the new digest, and the
-    digest check then passes a review that never happened. A real review of a
-    changed page writes down what it checked in the new version, so its text
-    differs from the old one. Needs git history; outside a git work tree there is
-    nothing to compare against, and the check is skipped.
-    """
-    folder, name = os.path.split(os.path.abspath(path))
-
-    def git(*args: str) -> str | None:
-        try:
-            done = subprocess.run(["git", *args], cwd=folder, capture_output=True, timeout=30)
-        except (OSError, subprocess.TimeoutExpired):
-            return None
-        return done.stdout.decode("utf-8", errors="replace") if done.returncode == 0 else None
-
-    commits = git("log", "--format=%H", "--", name)
-    if not commits:
-        return False
-    stamp_free = STAMP_LINE.sub("", body).strip()
-    for commit in commits.split():
-        old = git("show", f"{commit}:./{name}")
-        if old is None:
-            continue
-        old_digest = re.search(r"^reviewed-sha:\s*([0-9a-f]{16})\s*$", old, re.IGNORECASE | re.MULTILINE)
-        if old_digest and old_digest.group(1).lower() == digest:
-            continue
-        return STAMP_LINE.sub("", old).strip() == stamp_free
-    return False
-
-
-def check_reviews(rows: list[Row], reviews_dir: str) -> int:
+def check_reviews(rows: list[Row], manifest: str) -> int:
     """Delivery gate. A page still planned is unwritten work, not a note to keep.
 
     Run it whenever you want to know whether the set is finished; it fails while
@@ -451,49 +460,22 @@ def check_reviews(rows: list[Row], reviews_dir: str) -> int:
     is removed from the map and its source moved to the excluded list with a
     reason, so the decision is recorded where the coverage check reads it.
     """
-    problems: list[str] = []
+    states, manifest_problem = acceptance_states(manifest)
+    problems: list[str] = [manifest_problem] if manifest_problem else []
     for row in rows:
         if row["status"].lower() == "planned":
             problems.append(f"{row['page']}: still planned, so the set is not delivered")
             continue
         if row["status"].lower() != "reviewed":
             problems.append(f"{row['page']}: status is '{row['status']}', not reviewed")
-        for kind in ("factcheck", "reader"):
-            path = os.path.join(reviews_dir, f"{slug(row['page'])}.{kind}.md")
-            if not os.path.exists(path):
-                problems.append(f"{row['page']}: no {kind} review at {path}")
-                continue
-            with open(path, encoding="utf-8") as handle:
-                body = handle.read()
-            if not re.search(r"^verdict:\s*pass\s*$", body, re.IGNORECASE | re.MULTILINE):
-                problems.append(f"{row['page']}: {kind} review does not carry a line 'Verdict: PASS'")
-                continue
-
-            # A verdict judged one version of a page. Editing the page afterwards
-            # leaves an approval standing over content nobody reviewed, which is
-            # how a corrected page and a stale FAIL end up in the same report.
-            named = re.search(r"^reviewed:\s*(\S+)\s*$", body, re.IGNORECASE | re.MULTILINE)
-            digest = re.search(r"^reviewed-sha:\s*([0-9a-f]{16})\s*$", body, re.IGNORECASE | re.MULTILINE)
-            stamp = (named, digest) if named and digest else None
-            if not stamp:
-                problems.append(
-                    f"{row['page']}: {kind} review carries no 'Reviewed:' plus 'Reviewed-SHA:' stamp, "
-                    f"so nothing says which version it judged"
-                )
-                continue
-
-            current = page_digest(named.group(1))
-            if current is None:
-                problems.append(f"{row['page']}: {kind} review names {named.group(1)}, which does not exist")
-            elif current != digest.group(1).lower():
-                problems.append(
-                    f"{row['page']}: {kind} review is stale: the page changed after it was written. Review it again."
-                )
-            elif restamped(path, body, current):
-                problems.append(
-                    f"{row['page']}: {kind} review only changed its stamp since it judged an older version. "
-                    f"A review of the changed page says what it checked in it. Review it again."
-                )
+        if manifest_problem:
+            continue
+        if row["page"] not in states:
+            problems.append(f"{row['page']}: not in the manifest, so no card or review covers it")
+        elif states[row["page"]] is not None:
+            problems.append(f"{row['page']}: not accepted: {states[row['page']]}")
+    mapped = {row["page"] for row in rows}
+    problems += [f"{route}: in the manifest but not on the map" for route in states if route not in mapped]
     return fail(problems, "reviews")
 
 
@@ -601,11 +583,12 @@ def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("gate", choices=["status", "coverage", "map", "reviews", "links", "style", "mermaid", "all"])
+    parser.add_argument("gate", choices=["status", "coverage", "map", "surfaces", "reviews", "links", "style", "mermaid", "all"])
     parser.add_argument("--map", default="docs-work/map.md")
     parser.add_argument("--src", nargs="*", default=[])
     parser.add_argument("--docs", default=None)
-    parser.add_argument("--reviews", default="docs-work/reviews")
+    parser.add_argument("--manifest", default="docs-work/manifest.json")
+    parser.add_argument("--surfaces", default="docs-work/surfaces.md")
     parser.add_argument("--slices", default="docs-work/slices")
     args = parser.parse_args()
 
@@ -625,15 +608,20 @@ def main() -> int:
         return emit_mermaid(rows)
 
     if args.gate == "status":
-        return emit_status(rows, args.reviews, args.slices, args.src)
+        return emit_status(rows, args.manifest, args.slices, args.src, args.surfaces)
+
+    if args.gate == "surfaces":
+        return check_surfaces(args.surfaces, rows)
 
     status = 0
     if args.gate == "all":
         status |= check_slices(args.slices, args.src)
     if args.gate in {"map", "all"}:
         status |= check_map(rows, excluded, args.src)
+    if args.gate == "all":
+        status |= check_surfaces(args.surfaces, rows)
     if args.gate in {"reviews", "all"}:
-        status |= check_reviews(rows, args.reviews)
+        status |= check_reviews(rows, args.manifest)
     if args.gate in {"links", "all"} and args.docs:
         status |= check_links(rows, args.docs)
     if args.gate == "all" and args.docs:

@@ -6,7 +6,7 @@ separated by semicolons. An empty list is `-`.
 
 **Scope:** which packages, apps or services are being documented, in the user's words.
 **Excluded:** below, with a reason each.
-**Audience:** who each tier is written for.
+**Audience:** who each tier is written for, and what those readers already know.
 **Destination:** where the documentation lives, and what that decides about naming, nesting and links.
 **Conventions:** the project's own style rules, and where they are stated.
 

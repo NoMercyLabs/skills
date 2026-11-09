@@ -4,11 +4,9 @@
 
 Investigation must not change the project. The user is handing over a working codebase and expects it back untouched.
 
-**Only two kinds of writes are allowed:** the backup of existing documentation, and the new documentation files themselves. Nothing else, no formatting, no dependency installs, no lockfile updates.
+**Only three kinds of writes are allowed:** the backup of existing documentation, the new documentation files themselves, and `docs-work/`. Nothing else, no formatting, no dependency installs, no lockfile updates, no product code.
 
-**One deliberate exception: a bug the documentation work reveals gets FIXED, not written up.** If a documented option is never read, a binding never fires, or a method silently no-ops, the fix belongs in the code. Writing "note: this does not currently work" ships a disclaimer where a fix was possible, and the next reader inherits both the bug and the excuse. Fix it, add a regression test, prove the test fails without the fix, and say so when reporting.
-
-**A comment proven wrong is fixed in the source, not merely avoided on the page.** Two rows of one page turned out to be a verbatim transcription of a docblock whose first two lines the code did not support. Writing the page correctly and leaving the comment standing fixes this page and nothing else: the comment is what the next writer, and every reader of the source, will believe. It is a documentation defect that happens to live in a source file, so it falls inside this exception rather than outside it.
+**A bug the documentation work reveals becomes an issue, filed at once.** If a documented option is never read, a binding never fires, or a method silently no-ops, open an issue with the file and line. The page leaves the broken option out. A comment proven wrong in the source is reported the same way: the page is written correctly and the comment goes in the issue.
 
 The judgment line: fix what the documentation work uncovered about behavior the docs describe. Do not wander into unrelated refactors, formatting passes, or dependency work.
 

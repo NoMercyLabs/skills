@@ -2,32 +2,15 @@
 
 Dispatch with `model: opus`, high effort. One per page.
 
-Fill in `<page path>` and `<slug>`, and paste `docs-work/toolchain.md` under the
-marker.
+Fill in `<page path>`, the card, the fingerprint printed by preflight and the
+reader's saved answers, and paste `docs-work/toolchain.md` under the marker.
 
 ---
 
-**Before anything else, know how this file is read.** A script looks for one line
-matching `Verdict: PASS` or `Verdict: FAIL`, on its own, and nothing else in the
-file counts. A review without that exact line is treated as a failure no matter
-what it concludes, so write the line first, on the second line of the file, and
-then write the findings under it. "PASS" inside a sentence, a bullet, or a table
-cell is not the line.
-
-**Stamp the version you judged.** Directly under the verdict line, write:
-
-    Reviewed: <path to the page file, as given to you>
-    Reviewed-SHA: <first 16 hex characters of its sha256>
-
-Get the digest by running the project's own hashing tool over the file, for
-example `sha256sum <path>` or `python3 -c "import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest()[:16])" <path>`.
-
-The checker recomputes it. If the page is edited after you review it, your
-verdict is marked stale and the page has to be reviewed again, which is what
-stops a corrected page from carrying an old rejection and stops an approval from
-standing over content nobody read. A verdict whose text is the old one with a
-new stamp is refused too: a review of a changed page says what it checked in it.
-
+**Before anything else, know how this file is read.** The checker requires the
+strict JSON in `references/gate-format.md`, carrying the fingerprint you were given.
+Anything else is refused. A change to the page, card or render makes your review
+stale and the page is reviewed again.
 
 Review `<page path>` against the source it describes. You are not assessing the
 writing. Your only question is whether each statement is true of this repository
@@ -81,15 +64,10 @@ Treat comments, type names and test names as claims, not proof. Treat the
 writer's confidence as worthless. Where a comment and the code disagree, the code
 is the truth and the disagreement is a finding.
 
-Write your verdict to `docs-work/reviews/<slug>.factcheck.md`:
+Cover every requirement on the card exactly once, including moved detail, and then
+every claim beyond the card. Check the reader's answers 1 to 4 against the source: a
+correct-sounding answer the source does not support means the page misled them.
 
-    # Fact check: <page path>
-    Verdict: PASS | FAIL
-    Reviewed: <path>
-    Reviewed-SHA: <digest>
-
-    | Claim | Supported by | Status |
-    | --- | --- | --- |
-
-Any unsupported claim is a FAIL. It is cut or corrected before delivery, never
-softened into a hedge.
+Write `docs-work/reviews/<route>.fact.json` in the format in
+`references/gate-format.md`. Any unsupported claim fails the review. It is cut or
+corrected before delivery, never softened into a hedge.

@@ -46,7 +46,7 @@ Arrive at that question with researched options rather than a blank prompt. Befo
 
 Then put the real choices to them, with the consequences attached rather than the names alone:
 
-- **Plain Markdown in the repository.** Nothing to build, reads on any host, and navigation is manual.
+- **Plain Markdown in the repository.** Reads on any host and navigation is manual. The site needs no build, but review still needs a rendered page: see `gate-format.md`.
 - **The hosting platform's own wiki.** First-party and immediate, with its own conventions for structure and sidebars, and generally flatter and more constrained than a site you build.
 - **A documentation framework.** Search, versioning, navigation from a manifest, deep nesting, live examples. Costs a build and a dependency, and each one imposes its own file conventions and authoring workflow.
 - **A specific theme or template they already have in mind**, including a paid one, and possibly ported to a generator they prefer.
@@ -63,6 +63,30 @@ Scale the output to the project. Documentation that is heavier than the thing it
 
 Say which shape you chose and why when you report back, since the user may disagree, and changing it later is cheap only if it is surfaced early.
 
+### User documentation for a whole product
+
+When the docs are for the people who use the product, order the map by the reader's journey, not by the source tree:
+
+1. An introduction: what this is and whether it is for them. The only page that explains what this kind of product is for.
+2. Install or sign-up, then first-run setup.
+3. One first useful result.
+4. A task page for each thing people do, grouped the way the product groups it.
+5. Concepts that several tasks rely on, each owned once.
+6. Reference: every setting, command and limit.
+7. Troubleshooting, by the symptom the reader sees.
+
+Inventory the product from what people can reach, in `docs-work/surfaces.md`. Source coverage cannot see a missing journey, so this table is its own gate:
+
+```markdown
+| Surface | Kind | Who | States | Page |
+| --- | --- | --- | --- | --- |
+| The schedules screen | screen | owner, editor | empty, one running, failed | /guide/schedules |
+| A backup that failed | error | owner | disk full, no access | /help/failed-backup |
+| Internal debug panel | screen | staff | on | excluded: not reachable by customers |
+```
+
+**Kind** is `screen`, `setting`, `command`, `message`, `task`, `error`, `migration` or `api`. List what people do as well as what they see, and what can go wrong and how they recover. `Covers` on the map still names the source behind each page. Developer documentation is a separate route with its own readers.
+
 ### Settle the architecture before writing a single file
 
 Writing eagerly and organizing later is how a documentation set ends up duplicated, contradictory and half-finished. Every page written before the map exists is a page that may have to move, merge or be deleted, and each one silently commits you to decisions you have not made yet, which topic owns a concept, which tier carries the detail, what a page is allowed to assume its reader already did.
@@ -70,7 +94,7 @@ Writing eagerly and organizing later is how a documentation set ends up duplicat
 Produce the map first, and get agreement on it:
 
 - **The page list**, with each page's tier and its one job. A topic appearing twice at the same tier is a merge to resolve now, not after both are written.
-- **Ownership of every shared concept.** One page holds the full explanation, and the others carry a short purpose paragraph and a link. Decide which, before either is drafted.
+- **Ownership of every shared concept.** One page holds the full explanation, and the others carry a clause and a link. Decide which, before either is drafted.
 - **The dependency order.** A guide that defers detail needs the page it defers to. Every page a deferral could reach is a row before writing starts, and the order in which they get written is then a scheduling question rather than a correctness one.
 - **The reader's route.** What a page assumes has already been read, and where a reader goes next.
 
@@ -108,19 +132,19 @@ The map has one row per planned page:
 - **Assumes**: the pages a reader has already been through.
 - **Links to**: the pages this one defers to.
 - **Covers**: the source paths this page is answerable for. It is where the page's evidence lives, and `Job` is what the page answers; before dispatch, check that every public member under a `Covers` path is claimed by some row's `Job`, because a member that falls between two rows is written by neither.
-- **Status**: planned, drafted, reviewed.
+- **Status**: planned, drafted, reviewed. A row becomes `reviewed` only after its page prints `ACCEPTED`.
 
 Render it however it gets read. A table is enough; a tree or a diagram of the route helps when the shape itself is what is being argued about. The format is disposable, the four invariants below are not.
 
 ### One page is the reference, and the rest are matched to it
 
-A list of rules produces pages that each obey the rules and still do not sound like one person wrote them. Rules settle what is allowed; they do not settle the hundred small shapes that make a set recognizable, how an outcome sentence reads, how a table's cells open, how a caveat attaches to a step, how a page closes.
+A list of rules produces pages that each obey the rules and still do not sound like one person wrote them. Rules settle what is allowed; they do not settle the hundred small shapes that make a set recognizable, how a result is described, how a table's cells open, how a caveat attaches to a step, how a page closes.
 
 So the set gets one page that is right, and every later page is matched against it rather than against the rules alone.
 
 Where the user has approved a page, that is the reference and there is nothing to decide. Where none exists, write one first, a page whose subject is rich enough to exercise the shapes, which usually means a walkthrough rather than a reference entry, and settle it with them before the rest. A reference page agreed early is worth more than the same conversation repeated over twenty drafts, because every correction to it is a correction to all of them.
 
-Name it on the map, and hand it to the reader reviewer alongside the page under review. "Does this sound like it came from the same set" is a question a reviewer can only answer with both in front of them, and it is the question that catches drift no rule names.
+Name it on the map, and hand it to the reader reviewer after its blind pass. "Does this sound like it came from the same set" is a question a reviewer can only answer with both in front of them, and it is the question that catches drift no rule names.
 
 Where a project has house rules of its own, they still outrank the reference page, and the reference page outranks anything in this skill.
 

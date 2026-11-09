@@ -1,26 +1,26 @@
 ---
 name: atlas
 description: >-
-  A documentation authoring voice: read an entire project as one coherent system and produce complete, accurate, usable documentation in a consistent voice. Use this skill whenever the user wants a project, repo, or codebase documented, including "document this project", "write a README for this", "our docs are out of date", "the docs don't match the code anymore", "write onboarding docs", or any request to rewrite, audit, complete, or regenerate existing documentation. Use it even when the user only asks about a single doc file or README, because documenting one part correctly still requires understanding the whole system. Works for any project type: web apps, APIs, Unity/game projects, libraries, CLIs, data pipelines, mixed monorepos. Do not use it for inline docstrings in one file, or for end-user help content unrelated to a codebase.
+  Read an entire product as one system and write its full documentation from start to finish, accurate and in clear, human wording: user guides, onboarding, task guides, concepts, troubleshooting, reference and developer docs. Use this skill whenever the user wants a product, project, repo, or codebase documented, including "write the user documentation", "document this project", "write a README for this", "our docs are out of date", "the docs don't match the code anymore", "this reads like AI wrote it", "write onboarding docs", or any request to rewrite, audit, complete, or regenerate existing documentation. Use it even when the user only asks about a single doc file or README, because documenting one part correctly still requires understanding the whole system. Works for any project type: web apps, APIs, Unity/game projects, libraries, CLIs, data pipelines, mixed monorepos. Do not use it for inline docstrings in one file, UI copy, marketing, formal specifications, or document-format conversion.
 license: MIT
 compatibility: >-
-  Needs Python 3 for scripts/check_docs.py and a harness that can dispatch subagents
-  with a model per role. Tested in Claude Code.
+  Needs Python 3 for scripts/check_docs.py, check_page.py and check_batch.py, and a harness
+  that can dispatch subagents with a model per role. Tested in Claude Code.
 metadata:
   author: NoMercy Labs
-  version: "1.1.1"
+  version: "2.0.0"
   homepage: https://github.com/NoMercyLabs/skills/tree/main/skills/atlas
 ---
 
 # Atlas
 
-This skill is a documentation authoring voice, and the voice is enforced by artifacts rather than by intent.
+This skill writes a product's documentation from start to finish. The first job is to help the reader. A complete inventory is not proof that a page helps anyone, and a short page is not proof either.
 
 Three commitments hold it together.
 
-- **Every statement is grounded in something observed** in the code, config, or a command's output.
+- **Every page helps a real reader, in words a person would say.** It starts from what this reader does not know yet, not from what the product contains.
+- **Every statement is grounded in something observed** in the code, config, the running product, or a command's output.
 - **The set holds together as one whole**, with one vocabulary and no page contradicting another.
-- **The same thing is shaped the same way every time it appears**, at every size, without exception.
 
 `references/voice.md` is what those three mean, what they cost, and what they rule out. Read it before writing a word: it is the position every other file here serves, and the workflow below is only the order in which that position gets applied.
 
@@ -35,7 +35,9 @@ Everything goes in `docs-work/` beside the documentation. Keep it as the audit t
 | G0 scope | `docs-work/scope.md` | The user answered. Nothing is read in depth before it exists. |
 | G1 coverage | `docs-work/slices/*.md` | `check_docs.py coverage` passes: the union of every slice's `## Files opened` list equals a real walk of the tree. It runs at every scope, one page included. |
 | G2 map | `docs-work/map.md` | `check_docs.py map` passes. **No page is written before it does.** |
-| G3 reviews | `docs-work/reviews/*.md` | `check_docs.py reviews` passes: every row reviewed, two `Verdict: PASS` each. A row still planned fails it. |
+| G2a surfaces | `docs-work/surfaces.md` | `check_docs.py surfaces` passes: every screen, setting, command, message, task, error and migration people can reach, with who reaches it and its states, is claimed by a mapped page or excluded with a reason. |
+| G2b voice | `docs-work/voice.md` | The owner chose real passages, or an existing page they approved is named. No batch is written before it exists. |
+| G3 acceptance | `docs-work/cards/*.md`, `docs-work/manifest.json`, `docs-work/reviews/*.json`, `docs-work/results/*.log` | `check_batch.py docs-work/manifest.json --checkpoint docs-work/progress.md --final --routes <this batch>` prints `ACCEPTED` for each page, and `check_docs.py reviews` passes at the end. Map pages and manifest routes must match exactly. A row still planned fails it. Only `ACCEPTED` counts. |
 | G4 delivery | `docs-work/report.md` | `check_docs.py status --src <roots>` says DELIVERED, `links` and `style` pass, and the project's own doc gates are green. The status block is pasted at the top of the report. |
 | G5 finish | the run itself | `check_docs.py status` exits non-zero while any row is not `reviewed`. Wire it into the harness's stop condition, so ending the run early is refused rather than discouraged. In Claude Code, a `Stop` hook that runs it and exits non-zero while it fails is enough. |
 
@@ -47,19 +49,19 @@ python3 scripts/check_docs.py all --map docs-work/map.md --src src --docs docs
 
 Where Python is unavailable, the four map invariants are still countable by hand, that is why the map is a table. Counting by hand is the fallback, not the default, and the count goes in the report either way.
 
-**A gate that did not run has not passed.** Reporting a page as done without its two verdict files on disk is the failure this whole structure exists to make impossible.
+**A gate that did not run has not passed.** Reporting a page as done without its `ACCEPTED` result on disk is the failure this whole structure exists to make impossible.
 
-**The report opens with generated output, not with your account of the work.** Run `check_docs.py status` and paste its block verbatim as the first thing in `docs-work/report.md`. It prints DELIVERED or INCOMPLETE, pages reviewed out of total, the verdict tally and the coverage result, so the first line the user reads is a number rather than a summary. A report that opens any other way is not a report, and prose cannot talk its way past a count it did not produce.
+**The report opens with generated output, not with your account of the work.** Run `check_docs.py status` and paste its block verbatim as the first thing in `docs-work/report.md`. It prints DELIVERED or INCOMPLETE, pages accepted out of total and the coverage result, so the first line the user reads is a number rather than a summary. A report that opens any other way is not a report, and prose cannot talk its way past a count it did not produce.
 
-**A set is delivered when every row is reviewed and every verdict passes. Nothing else is delivery.** Eight pages of a hundred and seventy-six is progress, and progress is reported as INCOMPLETE with the fraction, never as a pass. The words for it are "N of M", at the top, before anything you are pleased about.
+**A set is delivered when every row is accepted. Nothing else is delivery.** Eight pages of a hundred and seventy-six is progress, and progress is reported as INCOMPLETE with the fraction, never as a pass. The words for it are "N of M", at the top, before anything you are pleased about.
 
-**A page whose review returned FAIL is not committed and does not move to `reviewed`.** The verdict is the point of running it, and committing over a FAIL turns the review into paperwork and puts a page the reviewer rejected in front of a reader. Fix the page and review it again, in this run, until both verdicts pass. Leaving it `drafted` and saying so is not the other half of that rule: it is the branch two runs took, and it is how a fraction gets reported as a set.
+**A page whose review returned FAIL is not committed and does not move to `reviewed`.** The verdict is the point of running it, and committing over a FAIL turns the review into paperwork and puts a page the reviewer rejected in front of a reader. Fix the page and review it again, in this run, until it is accepted. Leaving it `drafted` and saying so is not the other half of that rule: it is the branch two runs took, and it is how a fraction gets reported as a set.
 
 **The loop ends at DELIVERED and at nothing else.** There is no convenient stopping point, no natural pause, no sensible place to hand back. While one row is not `reviewed`, the work is not done and the run continues. Running out of room is the only ending that is not a failure, and it is a handover rather than a stop: the map's status column is the resume point, and a new session reads it, takes the first row that is not `reviewed`, and carries on. Two runs ended early at a moment that felt like a milestone, and both reported a fraction as if it were the whole.
 
-**Write in batches, review in batches, or the set never finishes.** One page at a time is what stopped the last two runs: a hundred and seventy-six pages at one writer and two reviewers each is more sequential turns than any session has. Dispatch eight to twelve writers at once, each carrying its map row, `docs-work/toolchain.md`, the approved reference page and the slice reports covering its `Covers` paths. Then review that whole batch in parallel, both reviews per page, fix what comes back, and dispatch the next batch. Writers never touch a shared file; the main session registers each finished page in navigation.
+**Write in batches, review in batches, or the set never finishes.** One page at a time is what stopped the last two runs: a hundred and seventy-six pages at one writer and two reviewers each is more sequential turns than any session has. Dispatch eight to twelve writers at once, each carrying its map row, its card, `docs-work/voice.md`, `docs-work/toolchain.md`, the approved reference page and the slice reports covering its `Covers` paths. Then review that whole batch in parallel, both reviews per page, fix what comes back, and dispatch the next batch. Writers never touch a shared file; the main session registers each finished page in navigation.
 
-**A batch that comes back with findings is repaired and re-reviewed inside the same run.** Not deferred to a later session, not listed in the report as outstanding, not left `drafted` while the run moves to fresh rows. A repair is new writing and is reviewed in full, and that cycle repeats until the batch carries two passing verdicts per page. Only then does the next batch start.
+**A batch that comes back with findings is repaired and re-reviewed inside the same run.** Not deferred to a later session, not listed in the report as outstanding, not left `drafted` while the run moves to fresh rows. A repair is new writing and is reviewed in full, and that cycle repeats until every page in the batch is accepted. Only then does the next batch start.
 
 **An instruction that offers a second option is not a rule, it is permission.** "Do this, or note that it is outstanding" reads as rigor and is the opposite: the first branch is work and the second is a sentence, so the second always wins under pressure, and the note lives in a session that ends while the gap ships. Anywhere a decision could go two ways, both ways end in the artifact: a row added, a row removed, an entry on the excluded list with its reason. Then a later session inherits the decision instead of inheriting a promise that nobody kept.
 
@@ -97,7 +99,7 @@ the formatter this project actually runs and the drift it has actually suffered.
 
 **No tier is allowed to buy savings with coverage.** The gates do not know which
 model ran: the slice union is still diffed against a real walk, and a page still
-needs two `Verdict: PASS` files.
+needs its `ACCEPTED` result.
 
 ## The workflow
 
@@ -115,9 +117,11 @@ Create one todo per phase and work them in order.
 
 **Phase 5: Choose the shape and draw the map.** Whether a documentation system already exists, and where it should live if not. Then one row per planned page in `docs-work/map.md`, settled with the user before a file is written. → `references/architecture.md`, `assets/map-template.md`
 
-**Phase 6: Write.** Dispatch `agents/writer.md` in batches, one per row, each carrying its map row, the toolchain answers, the reference page and the slice reports covering its source. Register each finished page in navigation yourself. → `references/writing.md`, `agents/writer.md`
+Then settle the voice, before any batch. Who reads this, and what do they already know? Write the answer on the map. Show the owner two short passages of a few lines each, drawn from the real product, and let them pick. "This one feels wrong" is a complete answer. Never ask them what makes documentation good, and never hand them a whole page to judge. Put each choice in `docs-work/voice.md` as an example with its reason, three or so, covering a task, a setting and a behavior that surprises people. → `references/voice.md`
 
-**Phase 7: Two reviews on every page.** A fact-check agent and a reader agent, separately, each writing a verdict file. → `agents/fact-checker.md`, `agents/reader.md`, `references/review.md`
+**Phase 6: Write.** Give every row a card in `docs-work/cards/` and an entry in `docs-work/manifest.json`, listing every page in scope before writing starts. Dispatch `agents/writer.md` in batches, one per row, each carrying its map row, card, the voice file, the toolchain answers, the reference page and the slice reports covering its source. Register each finished page in navigation yourself. → `references/gate-format.md`, `references/writing.md`, `agents/writer.md`
+
+**Phase 7: Two independent reviews, then acceptance.** `check_page.py <page> --card <card> --preflight` runs every check the card names. A fresh reader gets the output of `--reader-input` and saves its blind answers. Only then does `--warnings --reviews <dir>` show length warnings, and the reader judges each one. Only then does it get the voice file and the reference page, and it fails any page that goes against the owner's choices or re-explains what the card says the reader knows. A separate fact reviewer checks every claim and the reader's answers. `check_batch.py <manifest> --checkpoint docs-work/progress.md --final --routes <this batch>` prints `ACCEPTED`, and the checkpoint names where to resume. One fingerprint binds the page, card and rendered article, so any change to one of them forces new reviews. → `agents/reader.md`, `agents/fact-checker.md`, `references/review.md`, `references/gate-format.md`
 
 **Phase 8: Check it holds together, and report.** → `references/review.md`
 
@@ -144,6 +148,9 @@ Full detail, including which verification commands are safe to run: `references/
 - `references/architecture.md`: Phases 0, 4 and 5: scope, destination, the map and its invariants
 - `references/writing.md`: Phase 6: README, tiers, walkthroughs, surfaces, examples
 - `references/review.md`: Phases 7 and 8
+- `references/gate-format.md`: the card, the review files and the batch manifest
+- `scripts/check_page.py`: one page's preflight, blind reader input, warnings and acceptance
+- `scripts/check_batch.py`: a fixed batch, its acceptance and the resume point
 - `references/project-types.md`: what to look for per ecosystem
 - `agents/`: the three dispatch roles and the model each runs on
 - `references/toolchain.md`: the seven questions answered from the repository, before any slice is scanned

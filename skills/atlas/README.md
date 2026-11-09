@@ -19,10 +19,10 @@ The skill an agent loads when asked to document a project, repo, or codebase.
 3. **Read it as one system.** The tree is cut into slices and each slice is scanned in parallel. Every non-test source file is opened, and the coverage gate proves it.
 4. **Verify.** Scripts, environment variables, commands, versions and endpoints are checked against the code, not the old docs.
 5. **Audit existing docs.** Every claim is classified as still true, stale or wrong. Originals are backed up before anything is written.
-6. **Map.** One row per planned page: job, owned concepts, assumed pages, links, covered source, status. Settled with you before a page is written.
-7. **Write.** Writers run in parallel batches, one page each. The session registers each page in navigation.
-8. **Review.** Every page gets a fact-check and a reader review, each writing a verdict file stamped with the page's hash. A FAIL is fixed and re-reviewed in the same run.
-9. **Report.** The report opens with the generated status block. DELIVERED means every row reviewed with every verdict passing. Anything else is INCOMPLETE with the fraction.
+6. **Map and voice.** One row per planned page: job, owned concepts, assumed pages, links, covered source, status. Then you pick between short real passages, and those choices become the voice file. "This one feels wrong" is enough. Both are settled before a page is written.
+7. **Write.** Every page gets a card saying who reads it and what they already know. Writers run in parallel batches, one page each. The session registers each page in navigation.
+8. **Review.** A fresh reader answers questions about the rendered page before it sees any length warnings. A separate reviewer checks every claim. A failed page is fixed and re-reviewed in the same run.
+9. **Report.** The report opens with the generated status block. DELIVERED means every row printed `ACCEPTED` and coverage passed. Anything else is INCOMPLETE with the fraction.
 
 ## The work directory
 
@@ -34,7 +34,13 @@ docs-work/
 ├── toolchain.md      the seven answers, derived from this repository
 ├── slices/           one scanner report per slice
 ├── map.md            the page map, parsed by the checker
-├── reviews/          <slug>.factcheck.md and <slug>.reader.md per page
+├── surfaces.md       everything people can reach, and which page covers it
+├── voice.md          passages you chose, each with its reason
+├── cards/            who each page is for, what it must cover, its checks
+├── manifest.json     every page in scope, fixed before writing
+├── reviews/          <route>.reader.json and <route>.fact.json per page
+├── results/          the final acceptance output per page
+├── progress.md       accepted N of M and where to resume
 ├── report.md         opens with the generated status block
 └── skill-findings.md defects found in the skill itself, applied between runs
 ```
@@ -51,7 +57,8 @@ python3 scripts/check_docs.py all --map docs-work/map.md --src src --docs docs
 | --- | --- |
 | `coverage` | The union of every slice's `## Files opened` list equals a real walk of the source roots given with `--src`. Fails with no `--src` or an empty walk. The typed counts in a slice header are checked against its list and reported as warnings; the walk decides. Secret-bearing files are skipped out loud and fail the gate if a slice opened one. |
 | `map` | Every source path is covered by a page or excluded with a reason, every concept is owned by one page, every link and assumption names a planned page, every job is one sentence. |
-| `reviews` | Every row is `reviewed` and carries two `Verdict: PASS` files whose `Reviewed-SHA` matches the page's current content. |
+| `surfaces` | Every screen, setting, command, message, task, error and migration in `docs-work/surfaces.md` is on a mapped page or excluded with a reason. |
+| `reviews` | Every row is `reviewed` and its acceptance still matches the current page, card, rendered article and review files. |
 | `links` | Every internal link in the docs resolves to a file or a mapped page. |
 | `status` | Prints DELIVERED or INCOMPLETE. Runs `coverage` too, so it needs `--src`. Exits non-zero while any row is not reviewed or coverage has not passed, so it can be a stop condition. |
 | `mermaid` | Renders the map as a graph. |
@@ -82,9 +89,10 @@ atlas/
 │   ├── architecture.md          scope, destination, the map and its invariants
 │   ├── writing.md               tiers, walkthroughs, examples
 │   ├── review.md                the two reviews and delivery
+│   ├── gate-format.md           cards, review files and the manifest
 │   ├── toolchain.md             the seven questions
 │   └── project-types.md         where meaning hides per ecosystem
-└── scripts/check_docs.py        the gates
+└── scripts/                     check_docs.py, check_page.py, check_batch.py
 ```
 
 ## Installing
@@ -103,7 +111,9 @@ To make ending early impossible rather than discouraged, wire `check_docs.py sta
 
 **Gates, not rules.** A rule in a prompt is a promise, and a broken promise costs nothing. Every phase ends in a file on disk, and four of them end in a command that can reject the work.
 
-**A verdict is stamped with the version it judged.** Edit the page and the verdict goes stale. Without that, a fixed page keeps an old rejection and a rewritten page keeps an old approval.
+**Help the reader first.** A page starts from what this reader does not know. What this kind of product is for is said once, on the introduction page.
+
+**A review is bound to what it judged.** One fingerprint covers the page, card and rendered article. Change any of them and the reviews go stale. Without that, a fixed page keeps an old rejection and a rewritten page keeps an old approval.
 
 **Nothing language-specific ships.** A pack saying tests end in `Test` is recall, and it is wrong in exactly the projects with a house convention. The toolchain answers are derived per repository.
 
