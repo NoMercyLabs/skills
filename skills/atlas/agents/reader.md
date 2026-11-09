@@ -68,7 +68,9 @@ Your blind answers stay as they are. Add a finding, with a quote, for anything t
 - goes against a passage the owner chose;
 - explains what the reader already knows, or what the page before already taught;
 - would make a listener say a machine wrote it: matching halves, lists of three,
-  announcing the next fact, a bare transcript of clicks.
+  announcing the next fact, a bare transcript of clicks;
+- is a run of facts or edge cases you would not act on, an internal detail, or a
+  note that something does not work yet.
 
 Then set the verdict. A material finding fails the review, and each of these is
 material. A preference of your own that no chosen passage supports is not.

@@ -118,9 +118,9 @@ The distinction worth holding is between reminding and re-teaching. Reminding is
 
 The cost of this is one planning pass. The cost of skipping it is rewriting pages that were fine in isolation and wrong together.
 
-### Write the map to a file, and settle it with the user
+### Write the map to a file
 
-Do not hold the plan in your head or scatter it through a conversation. Produce one file, call it the documentation map, as the last act of research and the first thing the user sees. It is the artifact you both point at, and the moment to disagree about structure is while it is a list, not after twenty pages exist.
+Do not hold the plan in your head or scatter it through a conversation. Produce one file, call it the documentation map, as the last act of research. A second agent challenges it. The owner may read it, and is not asked to approve it unless a real product decision is open.
 
 Scale the map to the project, and keep it in every case. A single script needs three rows and takes a minute. A large repository, or a monorepo documenting many packages across hundreds of pages and thousands of source files, cannot be planned by intuition at all: there, every structural mistake made without a map is discovered late and paid for in rewrites. The small version costs almost nothing, so there is no size at which skipping it is the cheaper choice.
 
@@ -142,7 +142,7 @@ A list of rules produces pages that each obey the rules and still do not sound l
 
 So the set gets one page that is right, and every later page is matched against it rather than against the rules alone.
 
-Where the user has approved a page, that is the reference and there is nothing to decide. Where none exists, write one first, a page whose subject is rich enough to exercise the shapes, which usually means a walkthrough rather than a reference entry, and settle it with them before the rest. A reference page agreed early is worth more than the same conversation repeated over twenty drafts, because every correction to it is a correction to all of them.
+Where the user has approved a page, that is the reference and there is nothing to decide. Where none exists, write one first, a page whose subject is rich enough to exercise the shapes, which usually means a walkthrough rather than a reference entry, and have a second agent challenge it before the rest. A reference page agreed early is worth more than the same conversation repeated over twenty drafts, because every correction to it is a correction to all of them.
 
 Name it on the map, and hand it to the reader reviewer after its blind pass. "Does this sound like it came from the same set" is a question a reviewer can only answer with both in front of them, and it is the question that catches drift no rule names.
 

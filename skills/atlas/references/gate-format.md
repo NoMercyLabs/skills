@@ -25,7 +25,7 @@ Use each label once, with no omitted sections:
     Checks:
     - build: ["the-actual-executable", "its-actual-argument"]
 
-Replace the example's paths and command with the project's real values; it is not an executable card. Type is task, concept, lookup or troubleshoot. Use a local file reference (with an optional line range) or a primary HTTPS source for evidence. UI observations can be kept in a local evidence file. Each requirement ID is unique. Use "- none" under Moves elsewhere when nothing moves. The checker verifies every relocated route and fragment in Built-root; it does not invent a destination.
+Must know lists only what this reader needs on this page to act or to avoid a surprise. It is not an inventory of what the code does. Anything else goes under Moves elsewhere, or is left out. Replace the example's paths and command with the project's real values; it is not an executable card. Type is task, concept, lookup or troubleshoot. Use a local file reference (with an optional line range) or a primary HTTPS source for evidence. UI observations can be kept in a local evidence file. Each requirement ID is unique. Use "- none" under Moves elsewhere when nothing moves. The checker verifies every relocated route and fragment in Built-root; it does not invent a destination.
 
 Cards can be written before the site is built: Rendered only has to exist when preflight runs, and a named check may be the build that produces it.
 

@@ -77,7 +77,10 @@ words on what the reader could not assume.
 Put real requirements, and any consequence that starts the moment they act, before
 the action. Keep reasons, causes and outcomes; a page of bare clicks has failed too.
 
-Read the page aloud in your head. Where you would stop and go back, rewrite.
+Read the page aloud in your head. Where you would stop and go back, rewrite. Check
+the last third hardest: that is where a page turns into a list of edge cases. A fact
+the reader would not act on, an internal, or a known bug does not go on the page.
+Report it under Defects or Map problems.
 
 Shape belongs to the tier: a walkthrough is ordered by what the reader does, a
 concept page by what they need to understand, a reference page by the surface it

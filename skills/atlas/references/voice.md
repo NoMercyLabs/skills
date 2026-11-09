@@ -28,6 +28,12 @@ The three commitments are stated in the skill file. What each one costs is here.
 
 **Do not let it become a dry list of clicks.** Keep the reason for a choice, the cause of a result and what happens next. Cut only what teaches the category or describes the page.
 
+**Every fact has to earn its place with this reader.** Being true and verified is not enough. Ask what the reader would do differently for knowing it. If nothing, it does not go on this page. A list of edge cases at the end of a good explanation is the most common way a page turns back into a machine's inventory.
+
+**Internals and bugs are not page content.** How the code looks something up, a limit of the current version, a feature that does not work yet: file an issue and leave it off the page. Tell the reader only what they will see and what they can do about it.
+
+**When a page keeps going after its main story, it is several pages.** Move the rest to a page that owns it, written as its own explanation, and link it. Rare exceptions go where a person with that problem will look: a troubleshooting entry named after the symptom.
+
 Nine decisions shape the writing:
 
 1. Start from what this reader does not know yet. A concept or lookup answers the question directly.
@@ -52,9 +58,9 @@ Tells them what they could not assume:
 >
 > Go to **Backups** and choose **New schedule**. Pick a folder, leave **Keep** at 30 days, and save.
 
-The project's own examples live in `docs-work/voice.md`, chosen by the owner from real passages. They outrank this section. Learn the decisions they make, and do not reproduce them as a template. When two passages in that file pull in different directions, the newest choice wins and the older one is marked superseded, so no writer can justify opposite approaches from one file.
+The project's own examples live in `docs-work/voice.md`. They outrank this section, and anything the owner chose outranks the rest of that file. Learn the decisions they make, and do not reproduce them as a template. When two passages in that file pull in different directions, the newest choice wins and the older one is marked superseded, so no writer can justify opposite approaches from one file.
 
-Agreement between agents does not prove a human voice. When two agents share the work, each tells the other directly what is wrong with its work, and they settle it before the owner sees it. Read-aloud is the listening test: a sentence that makes a reader stop and go back has failed, however correct it is.
+Agreement between agents does not prove a human voice. When two agents share the work, each tells the other directly what is wrong with its work, and they settle it. The owner is never the one who has to catch it. Read-aloud is the listening test: a sentence that makes a reader stop and go back has failed, however correct it is.
 
 ### Every sentence has an origin, and the origin is the code
 

@@ -19,7 +19,7 @@ The skill an agent loads when asked to document a project, repo, or codebase.
 3. **Read it as one system.** The tree is cut into slices and each slice is scanned in parallel. Every non-test source file is opened, and the coverage gate proves it.
 4. **Verify.** Scripts, environment variables, commands, versions and endpoints are checked against the code, not the old docs.
 5. **Audit existing docs.** Every claim is classified as still true, stale or wrong. Originals are backed up before anything is written.
-6. **Map and voice.** One row per planned page: job, owned concepts, assumed pages, links, covered source, status. Then you pick between short real passages, and those choices become the voice file. "This one feels wrong" is enough. Both are settled before a page is written.
+6. **Map and voice.** One row per planned page: job, owned concepts, assumed pages, links, covered source, status. Two agents write and challenge real passages until they agree, and those become the voice file. You are not asked to judge wording. Both are settled before a page is written.
 7. **Write.** Every page gets a card saying who reads it and what they already know. Writers run in parallel batches, one page each. The session registers each page in navigation.
 8. **Review.** A fresh reader answers questions about the rendered page before it sees any length warnings. A separate reviewer checks every claim. A failed page is fixed and re-reviewed in the same run.
 9. **Report.** The report opens with the generated status block. DELIVERED means every row printed `ACCEPTED` and coverage passed. Anything else is INCOMPLETE with the fraction.
