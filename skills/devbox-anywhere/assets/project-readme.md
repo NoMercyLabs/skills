@@ -13,7 +13,7 @@ This is the **editor**, not the application.
 ## Start
 
 ```bash
-cp devbox/.env.example devbox/.env      # set DEVBOX_PASSWORD
+cp devbox/.env.example devbox/.env      # set DEVBOX_PASSWORD (required)
 docker compose -f devbox/docker-compose.yml up -d --build
 ```
 
@@ -68,8 +68,8 @@ works on the host exactly as it does without the container.
 
 <!-- Include only if the docker socket is mounted:
 The host docker socket is mounted, so containers you start are siblings rather than nested. On
-Docker Desktop the socket arrives root-owned, so prefix with `sudo`; on a Linux host the entrypoint
-joins the socket's group and plain `docker` works.
+Docker Desktop the socket arrives root-owned and docker is unavailable in the box; on a Linux host
+the entrypoint joins the socket's group and plain `docker` works.
 -->
 
 ## Running the gates

@@ -140,7 +140,7 @@ ARG USER_UID=1000
 ARG USER_GID=1000
 RUN if getent group ${USER_GID} >/dev/null; then groupmod -n ${USERNAME} "$(getent group ${USER_GID} | cut -d: -f1)"; else groupadd -g ${USER_GID} ${USERNAME}; fi \
     && if getent passwd ${USER_UID} >/dev/null; then usermod -l ${USERNAME} -d /home/${USERNAME} -m "$(getent passwd ${USER_UID} | cut -d: -f1)"; else useradd -m -u ${USER_UID} -g ${USER_GID} -s /bin/bash ${USERNAME}; fi \
-    && echo "${USERNAME} ALL=(root) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /usr/bin/dpkg, /usr/sbin/groupadd, /usr/sbin/usermod, /usr/bin/docker" > /etc/sudoers.d/${USERNAME} && chmod 0440 /etc/sudoers.d/${USERNAME}
+    && echo "${USERNAME} ALL=(root) NOPASSWD: /usr/local/bin/devbox-docker-group" > /etc/sudoers.d/${USERNAME} && chmod 0440 /etc/sudoers.d/${USERNAME}
 ```
 
 Many base images already have a UID-1000 user under a different name — hence the rename branches

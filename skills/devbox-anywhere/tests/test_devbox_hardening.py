@@ -24,7 +24,7 @@ def sudoers_commands(text):
 
 class PortBinding(unittest.TestCase):
     def test_published_ports_bind_loopback_by_default(self):
-        ports = re.findall(r'^\s*- "(.*?:\d+:\d+)"', read("assets/docker-compose.yml"), re.M)
+        ports = re.findall(r'^\s*- "([^"]*:(?:8080|2222))"', read("assets/docker-compose.yml"), re.M)
         self.assertEqual(len(ports), 2, ports)
         for p in ports:
             self.assertTrue(p.startswith("${DEVBOX_BIND:-127.0.0.1}:"), p)

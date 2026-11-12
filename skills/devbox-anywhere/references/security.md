@@ -49,7 +49,7 @@ interactive terminal. For each name, the script asks the tool itself whether it 
 ```
   ✓ git
   ✗ gh      → gh auth login
-  ✗ docker  → sudo docker (Docker Desktop hands the socket over root-owned), or check the mount
+  ✗ docker  → check the socket mount (Docker Desktop hands it over root-owned; see below)
 ```
 
 **What crosses the boundary:** tool names in, a pass/fail line out. Nothing else.
@@ -78,12 +78,13 @@ converts that into a checklist shown before any work starts.
 Development environments need real capability. These are the deliberate grants; each is listed so
 an operator can remove it knowingly.
 
-**Passwordless sudo inside the container, for a fixed list of commands.** `apt-get`, `apt` and
-`dpkg`, so a developer can install a missing package mid-task; `groupadd` and `usermod`, which the
-entrypoint needs to join the docker socket's group; and `docker`, for the Docker Desktop case where
-the socket arrives root-owned. Every other command asks for a password the user does not have.
-Its scope is the container, not the host. Remove the `sudoers.d` line if your policy forbids it,
-and the socket group-join is then the only feature that stops working.
+**Passwordless sudo for one helper only.** `/usr/local/bin/devbox-docker-group` takes no
+arguments, reads the mounted socket's gid itself and joins that group (never gid 0). Nothing else
+is granted. `apt-get`, `apt`, `dpkg`, `usermod`, `groupadd` and `docker` are not: each one gives
+root inside the container (a package script, `usermod -u 0`, a privileged container), so listing
+them would be passwordless root. Install packages in the Dockerfile at build time. On Docker
+Desktop the socket is root-owned and `docker` stays unavailable; use `group_add` or a rootless
+socket. Remove the `sudoers.d` line to drop even the helper; only the socket group-join stops.
 
 **The bootstrap command.** `DEVBOX_BOOTSTRAP` in `docker-compose.yml` is run by the entrypoint at
 start, as the unprivileged user, so a dependency restore happens before the first terminal opens.
@@ -111,7 +112,13 @@ it needs **both** of:
 
 1. **A transport and gate you control** — TLS plus an auth gate at the reverse proxy
    (`assets/Caddyfile.hosted.example`).
-2. **code-server's own password** — `DEVBOX_PASSWORD`.
+2. **code-server's own password** — `DEVBOX_PASSWORD`. Required: compose and the entrypoint
+   refuse to start with it empty or set to the placeholder.
+
+The published ports bind `127.0.0.1` by default. `DEVBOX_BIND=0.0.0.0` is the opt-in for a shared
+box, and only behind the proxy above.
+
+Review checklist line: `docker port <container>` shows `127.0.0.1:8443` and `127.0.0.1:2222`.
 
 And, before exposing: confirm with the user, and check whether the docker socket is mounted. With
 the socket enabled, exposing the editor is exposing the host, full stop.

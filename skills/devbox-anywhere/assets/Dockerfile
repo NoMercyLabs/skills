@@ -59,16 +59,13 @@ RUN curl -fsSL "https://github.com/coder/code-server/releases/download/v${CODE_S
 # The rename branches exist because many base images already ship a user at uid 1000 under a
 # different name - a bare useradd fails on exactly those images.
 #
-# Passwordless sudo is granted for a fixed list of commands, not for everything: the package
-# manager, so a developer can install a missing tool mid-task; groupadd and usermod, which the
-# entrypoint needs to join the docker socket's group; and docker itself, for the Docker Desktop
-# case where the socket arrives root-owned. Anything else asks for a password the user does not
-# have, which is the point. Scope of that power is this container, not the host. Drop the sudoers
-# line if your policy requires it - the docker socket group-join is then the only thing that
-# stops working.
+# The only passwordless sudo is one root-owned helper with no arguments (devbox-docker-group), which
+# joins the docker socket's group. apt, dpkg, usermod and docker are NOT granted: each one is root.
+# Install packages in this Dockerfile at build time. Dropping the sudoers line costs only the
+# socket group-join.
 RUN if getent group ${USER_GID} >/dev/null; then groupmod -n ${USERNAME} "$(getent group ${USER_GID} | cut -d: -f1)"; else groupadd -g ${USER_GID} ${USERNAME}; fi \
     && if getent passwd ${USER_UID} >/dev/null; then usermod -l ${USERNAME} -d /home/${USERNAME} -m "$(getent passwd ${USER_UID} | cut -d: -f1)"; else useradd -m -u ${USER_UID} -g ${USER_GID} -s /bin/bash ${USERNAME}; fi \
-    && echo "${USERNAME} ALL=(root) NOPASSWD: /usr/bin/apt-get, /usr/bin/apt, /usr/bin/dpkg, /usr/sbin/groupadd, /usr/sbin/usermod, /usr/bin/docker" > /etc/sudoers.d/${USERNAME} \
+    && echo "${USERNAME} ALL=(root) NOPASSWD: /usr/local/bin/devbox-docker-group" > /etc/sudoers.d/${USERNAME} \
     && chmod 0440 /etc/sudoers.d/${USERNAME} \
     # Every directory a named volume will mount over must exist here and be owned by the user.
     # Docker seeds an empty named volume from the image path; if the path is missing, the volume
@@ -83,6 +80,7 @@ RUN if getent group ${USER_GID} >/dev/null; then groupmod -n ${USERNAME} "$(gete
 COPY --chown=${USER_UID}:${USER_GID} settings/ /opt/devbox/settings/
 COPY entrypoint.sh /usr/local/bin/devbox-entrypoint
 COPY auth-onboarding.sh /usr/local/bin/devbox-auth
+COPY --chmod=0755 devbox-docker-group.sh /usr/local/bin/devbox-docker-group
 
 # The hook that runs the auth report. Installed in TWO places because a shell reads only one of
 # them: /etc/profile.d covers login shells (Remote-SSH), /etc/bash.bashrc covers interactive

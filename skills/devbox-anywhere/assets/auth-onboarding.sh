@@ -60,7 +60,7 @@ fix() {
         glab)    echo "glab auth login" ;;
         claude)  echo "claude  (then /login)" ;;
         git)     echo "git config --global user.email you@example.com  (or mount your ~/.gitconfig)" ;;
-        docker)  echo "sudo docker (Docker Desktop hands the socket over root-owned), or check the mount" ;;
+        docker)  echo "check the socket mount (Docker Desktop hands it over root-owned; see references/security.md)" ;;
         npm)     echo "npm login" ;;
         aws)     echo "aws configure  (or aws sso login)" ;;
         gcloud)  echo "gcloud auth login" ;;

@@ -29,9 +29,8 @@ services:
       - path: .env
         required: false
     environment:
-      # code-server's login password. Empty makes code-server generate one into a config file
-      # inside the container, where the user then has to go looking for it.
-      PASSWORD: ${DEVBOX_PASSWORD:-}
+      # code-server's login password. Required: compose refuses to start without one.
+      PASSWORD: ${DEVBOX_PASSWORD:?set DEVBOX_PASSWORD in devbox/.env}
       DEVBOX_ENABLE_SSH: ${DEVBOX_ENABLE_SSH:-1}
       DEVBOX_WORKSPACE: /workspace
       # Tool NAMES only - the first terminal reports which of these still need a login. No
@@ -57,8 +56,9 @@ services:
       # No credential variables here. The user logs in inside the box, so each credential is scoped
       # there and revocable on its own. Read references/security.md before changing this.
     ports:
-      - "${DEVBOX_PORT:-8443}:8080"      # code-server
-      - "${DEVBOX_SSH_PORT:-2222}:2222"  # Remote-SSH
+      # Loopback only. Set DEVBOX_BIND=0.0.0.0 only behind the proxy in Caddyfile.hosted.example.
+      - "${DEVBOX_BIND:-127.0.0.1}:${DEVBOX_PORT:-8443}:8080"      # code-server
+      - "${DEVBOX_BIND:-127.0.0.1}:${DEVBOX_SSH_PORT:-2222}:2222"  # Remote-SSH
       # One line per port this project's dev servers bind, so behaviour inside the box matches
       # behaviour outside it.
     volumes:

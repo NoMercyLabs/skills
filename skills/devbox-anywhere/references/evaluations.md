@@ -112,7 +112,7 @@ Each of these was a real defect. A change to the skill should keep them fixed.
 | A credential is still missing when a second terminal opens | The report appears again — the marker is written only when the pending count is 0, never on "it was shown once" |
 | The hook gates on `devbox-auth`'s exit status | Cannot happen — the report always exits 0 by design, so the hook reads `/tmp/.devbox-auth-pending`; gating on `$?` suppressed the report permanently |
 | An extension needs a host binary it does not ship (todo-tree → ripgrep) | The binary is installed in the image and the setting points at it, instead of the extension erroring on activation |
-| Docker socket arrives as gid 0 (Docker Desktop) | The entrypoint refuses to join group root and prints the `sudo docker` route |
+| Docker socket arrives as gid 0 (Docker Desktop) | The entrypoint refuses to join group root and logs that docker stays unavailable (no sudo route) |
 | A named volume path is missing from the image | Caught: the volume mounts root-owned and the first write fails |
 | An agent CLI installs but its native binary does not | Caught at build time — the layer asserts the CLI answers `--version` |
 | The box opens in Restricted Mode | Cannot happen — workspace trust is off in the settings baseline, and Step 4 checks the rendered page for the banner |

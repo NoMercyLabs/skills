@@ -56,7 +56,7 @@ All three attach to the **same container** — same caches, same running process
 
 | Way | How | Good for |
 |---|---|---|
-| **Browser** | `http://localhost:8443`, password from `.env` | Sharing. Nothing to install on the other person's machine. |
+| **Browser** | `http://localhost:8443` (loopback by default), password from `.env` (required) | Sharing. Nothing to install on the other person's machine. |
 | **Local VS Code** | *Dev Containers: Reopen in Container* | Your own machine, native editor, full keybindings. |
 | **Remote-SSH** | key-only `sshd` on 2222, as the unprivileged container user | Another machine on your network, or a box on a server. |
 
@@ -138,7 +138,7 @@ status`, `docker info`, `git config --get user.email` — and prints one line ea
 ```
   ✓ git
   ✗ gh      → gh auth login
-  ✗ docker  → sudo docker (Docker Desktop hands the socket over root-owned), or check the mount
+  ✗ docker  → check the socket mount (Docker Desktop hands it over root-owned; see security.md)
 ```
 
 Then it exits. **You** run `gh auth login`, inside the box, yourself.
@@ -172,7 +172,7 @@ Full detail in [references/security.md](references/security.md). The invariants:
 - The editor does not run as root.
 
 Powers the box *does* hold, stated plainly so you can remove them knowingly: passwordless sudo
-**inside the container** for a fixed list of commands (the package manager, groupadd, usermod, docker), full access to the mounted repository, and — **opt-in, commented out in
+**inside the container** for one argument-less helper that joins the docker socket's group (no package manager, no usermod, no docker), full access to the mounted repository, and — **opt-in, commented out in
 the template** — the host's docker socket, which is root-equivalent control of the host machine.
 
 If the box will be reachable by anyone else, it needs TLS plus an auth gate at the proxy **and**

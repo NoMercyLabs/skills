@@ -42,19 +42,14 @@ git config --global --add safe.directory "${WORKSPACE}" 2>/dev/null || true
 # the host's gid has no local name.
 #
 # gid 0 is excluded: that is what Docker Desktop hands over, and "join group root" is a privilege
-# escalation, not a permission fix. There, sudo is the correct route and the message says so.
+# escalation, not a permission fix. There, set group_add in compose or use a rootless socket.
 if [ -S /var/run/docker.sock ] && ! docker info >/dev/null 2>&1; then
     SOCK_GID="$(stat -c '%g' /var/run/docker.sock)"
     if [ "${SOCK_GID}" = "0" ]; then
-        log "docker socket is root-owned (Docker Desktop) - use 'sudo docker' in this box"
+        log "docker socket is root-owned (Docker Desktop) - docker stays unavailable; see references/security.md"
     else
-        SOCK_GROUP="$(getent group "${SOCK_GID}" | cut -d: -f1)"
-        if [ -z "${SOCK_GROUP}" ]; then
-            SOCK_GROUP=dockerhost
-            sudo groupadd -g "${SOCK_GID}" "${SOCK_GROUP}" 2>/dev/null || true
-        fi
-        sudo usermod -aG "${SOCK_GROUP}" "$(id -un)" 2>/dev/null || true
-        log "joined group ${SOCK_GROUP} (gid ${SOCK_GID}) for docker socket access"
+        sudo -n /usr/local/bin/devbox-docker-group 2>/dev/null || true
+        log "requested docker socket group (gid ${SOCK_GID}); takes effect in new shells"
     fi
 fi
 
@@ -160,6 +155,11 @@ EOF
 fi
 
 # --- code-server -------------------------------------------------------------
+# Refuse an empty or placeholder password, whatever the compose file let through.
+if [ -z "${PASSWORD:-}" ] || [ "${PASSWORD}" = "change-me" ]; then
+    log "DEVBOX_PASSWORD is empty or the placeholder - refusing to start; set a real one in devbox/.env"
+    exit 1
+fi
 # exec, so code-server becomes PID 1 and receives docker's stop signal directly. Without exec it
 # would be a child of this shell, miss SIGTERM, and be killed after the grace period instead of
 # shutting down cleanly.
