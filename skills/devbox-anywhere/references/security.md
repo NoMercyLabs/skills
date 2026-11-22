@@ -80,7 +80,8 @@ an operator can remove it knowingly.
 
 **Passwordless sudo for one helper only.** `/usr/local/bin/devbox-docker-group` takes no
 arguments, reads the mounted socket's gid itself and joins that group (never gid 0). Nothing else
-is granted. `apt-get`, `apt`, `dpkg`, `usermod`, `groupadd` and `docker` are not: each one gives
+is granted. The entrypoint then starts code-server through `sg` under that group, because a
+group joined after a process starts never reaches that process or its terminals. `apt-get`, `apt`, `dpkg`, `usermod`, `groupadd` and `docker` are not: each one gives
 root inside the container (a package script, `usermod -u 0`, a privileged container), so listing
 them would be passwordless root. Install packages in the Dockerfile at build time. On Docker
 Desktop the socket is root-owned and `docker` stays unavailable; use `group_add` or a rootless

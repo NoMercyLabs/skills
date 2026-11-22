@@ -68,5 +68,25 @@ class Sudoers(unittest.TestCase):
             self.assertNotIn("for a fixed list of commands (the package manager", text, rel)
 
 
+class DockerSocketGroup(unittest.TestCase):
+    """AUD-9751: a group joined after the process started never reaches that process."""
+
+    def test_editor_is_started_under_the_socket_group(self):
+        text = read("assets/entrypoint.sh")
+        self.assertRegex(text.split("# --- code-server")[1], r"(?m)^\s*exec (sg|setpriv)\b",
+                         "code-server must run under the new group")
+
+    def test_group_name_is_resolved_from_the_socket_gid(self):
+        self.assertRegex(read("assets/entrypoint.sh"), r"getent group \"\$\{?SOCK_GID\}?\"")
+
+    def test_entrypoint_is_valid_shell(self):
+        import shutil, subprocess
+        if not shutil.which("bash"):
+            self.skipTest("no bash")
+        r = subprocess.run(["bash", "-n"], input=read("assets/entrypoint.sh").replace("\r\n", "\n").encode(),
+                           capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stderr.decode())
+
+
 if __name__ == "__main__":
     unittest.main()
