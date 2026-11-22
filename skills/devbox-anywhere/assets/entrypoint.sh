@@ -49,7 +49,18 @@ if [ -S /var/run/docker.sock ] && ! docker info >/dev/null 2>&1; then
         log "docker socket is root-owned (Docker Desktop) - docker stays unavailable; see references/security.md"
     else
         sudo -n /usr/local/bin/devbox-docker-group 2>/dev/null || true
-        log "requested docker socket group (gid ${SOCK_GID}); takes effect in new shells"
+        # Group membership is read when a process starts, so the join above does not reach this
+        # process or anything it starts. code-server is therefore started through sg below, which
+        # gives it (and every terminal it opens) the new group.
+        SOCK_ENTRY="$(getent group "${SOCK_GID}" || true)"
+        SOCK_GROUP="${SOCK_ENTRY%%:*}"
+        # sg asks a non-member for a group password, which would hang the start. Only use it when
+        # the helper really added this user to the group.
+        case ",${SOCK_ENTRY##*:}," in
+            *",$(id -un),"*) ;;
+            *) SOCK_GROUP="" ;;
+        esac
+        log "requested docker socket group (gid ${SOCK_GID}); the editor starts under it"
     fi
 fi
 
@@ -164,6 +175,11 @@ fi
 # would be a child of this shell, miss SIGTERM, and be killed after the grace period instead of
 # shutting down cleanly.
 log "code-server on ${PORT}, workspace ${WORKSPACE}"
+if [ -n "${SOCK_GROUP:-}" ]; then
+    # sg runs its command in place of itself, so the inner exec keeps code-server as PID 1.
+    export PORT WORKSPACE
+    exec sg "${SOCK_GROUP}" -c 'exec code-server --bind-addr "0.0.0.0:${PORT}" --disable-telemetry --disable-update-check "${WORKSPACE}"'
+fi
 exec code-server \
     --bind-addr "0.0.0.0:${PORT}" \
     --disable-telemetry \
