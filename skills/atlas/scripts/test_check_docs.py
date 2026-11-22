@@ -118,6 +118,15 @@ class CoverageTests(unittest.TestCase):
         self.assertIn("warning", out)
         self.assertIn("the list names 2", out)
 
+    def test_a_bare_name_shared_by_two_files_is_ambiguous_and_fails(self) -> None:
+        self.work.write("src/a/main.py", "x = 1\n")
+        self.work.write("src/b/main.py", "y = 2\n")
+        self.work.write("docs-work/slices/one.md", slice_report(["main.py"]))
+        code, out = run(check_docs.check_slices, "docs-work/slices", ["src"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("ambiguous path", out)
+        self.assertIn("main.py", out)
+
     def test_an_unread_file_still_fails(self) -> None:
         self.work.write("src/a.py", "x = 1\n")
         self.work.write("src/b.py", "y = 2\n")

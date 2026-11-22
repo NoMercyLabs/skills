@@ -320,7 +320,19 @@ def check_slices(slices_dir: str, srcs: list[str]) -> int:
     files = source_files(srcs, secrets, dotfiles)
     if not files:
         problems.append(f"no source files found under {', '.join(srcs)}, so the walk compared nothing")
-    unread = [p for p in files if not any(p == o or p.endswith("/" + o) or o.endswith("/" + p) for o in opened)]
+    # A listed path must identify one walked file. A bare name or a short tail
+    # shared by several files proves none of them was opened.
+    read: set[str] = set()
+    for listed_path in sorted(opened):
+        matches = [p for p in files if p == listed_path or p.endswith("/" + listed_path) or listed_path.endswith("/" + p)]
+        if len(matches) > 1:
+            problems.append(
+                f"ambiguous path {listed_path} (in {', '.join(opened[listed_path])}) matches "
+                f"{len(matches)} files: {', '.join(matches[:5])}; list the full path"
+            )
+            continue
+        read.update(matches)
+    unread = [p for p in files if p not in read]
     print(f"  read: {len(files) - len(unread)} of {len(files)} source files, across {len(opened)} listed path(s)")
     for warning in warnings:
         print(f"  warning: {warning}")

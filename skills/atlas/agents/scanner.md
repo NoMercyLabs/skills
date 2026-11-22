@@ -54,7 +54,9 @@ Rules that decide whether your report is usable:
 - The list under `## Files opened` is the evidence. The checker reads that one
   section and compares it with a walk of the tree, so a path named anywhere else
   does not count as read. The two counts in the header must match the list; a
-  count that disagrees is reported against you.
+  count that disagrees is reported against you. List each file by its path from
+  the scan root, never by bare name: a name shared by two files is rejected as
+  ambiguous.
 
 **An empty section is a claim, and it is the claim most often wrong.** Reporting
 no drift and no traps across a real slice usually means the pass was shallow,
