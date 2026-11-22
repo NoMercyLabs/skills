@@ -241,6 +241,14 @@ class StatusTests(ReviewedPage):
         self.assertIn("STATUS: INCOMPLETE", out)
         self.assertIn("Pages accepted: 0 of 1", out)
 
+    def test_status_is_incomplete_when_the_page_text_changed_after_acceptance(self) -> None:
+        self.work.write("docs-work/slices/one.md", slice_report(["src/a.py"]))
+        self.page.page.write_text(self.page.page.read_text(encoding="utf-8") + "\nOne more line.\n", encoding="utf-8")
+        code, out = self.status(["src"])
+        self.assertEqual(code, 1, out)
+        self.assertIn("STATUS: INCOMPLETE", out)
+        self.assertIn("Pages accepted: 0 of 1", out)
+
 
 class ReviewTests(ReviewedPage):
     """`reviews`: only an acceptance that still matches the page, card and render counts."""
