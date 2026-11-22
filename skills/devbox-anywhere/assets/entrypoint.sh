@@ -176,7 +176,8 @@ fi
 # shutting down cleanly.
 log "code-server on ${PORT}, workspace ${WORKSPACE}"
 if [ -n "${SOCK_GROUP:-}" ]; then
-    # sg runs its command in place of itself, so the inner exec keeps code-server as PID 1.
+    # On the first start sg stays as the parent of code-server and passes the stop signal on
+    # (measured: docker stop ends in 1 s). After a restart the group is already set and sg is skipped.
     export PORT WORKSPACE
     exec sg "${SOCK_GROUP}" -c 'exec code-server --bind-addr "0.0.0.0:${PORT}" --disable-telemetry --disable-update-check "${WORKSPACE}"'
 fi
