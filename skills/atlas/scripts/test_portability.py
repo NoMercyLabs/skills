@@ -42,6 +42,29 @@ class PortabilityTests(unittest.TestCase):
                             leaks.append(f"{os.path.relpath(path, ROOT)}:{number}: {word}")
         self.assertEqual(leaks, [], "home-project vocabulary in a portable skill:/n" + "\n".join(leaks))
 
+    def test_references_do_not_tell_the_run_to_fix_product_code(self):
+        """SKILL.md allows three writes and files an issue for a defect.
+
+        A reference that tells the agent to fix code contradicts the skill
+        that loads it (AUD-9750), so the wording is checked.
+        """
+        banned = re.compile(
+            r"gets FIXED|fix what the documentation work|fix the code|"
+            r"fixed in the source|add a regression test|fix belongs in the code",
+            re.IGNORECASE,
+        )
+        hits = []
+        for base, _dirs, names in os.walk(ROOT):
+            for name in names:
+                if not name.endswith(".md"):
+                    continue
+                path = os.path.join(base, name)
+                with open(path, encoding="utf-8") as handle:
+                    for number, line in enumerate(handle, start=1):
+                        if banned.search(line):
+                            hits.append(f"{os.path.relpath(path, ROOT)}:{number}")
+        self.assertEqual(hits, [], "reference tells the run to change product code:\n" + "\n".join(hits))
+
 
 if __name__ == "__main__":
     unittest.main()
